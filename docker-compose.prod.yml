@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.prod.yml — Production overrides
+# Run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  api:
+    build:
+      target: production
+    command: node dist/app.js
+    volumes: []             # no source mounts in prod
+    environment:
+      NODE_ENV: production
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  web:
+    build:
+      target: production
+    command: node server.js
+    volumes: []
+    environment:
+      NODE_ENV: production
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  admin:
+    build:
+      target: production
+    command: node server.js
+    volumes: []
+    environment:
+      NODE_ENV: production
+
+  pandit:
+    build:
+      target: production
+    command: node server.js
+    volumes: []
+    environment:
+      NODE_ENV: production
+
+  nginx:
+    volumes:
+      - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+
+  postgres:
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports: []              # no external port in prod
+
+  redis:
+    ports: []
+    
