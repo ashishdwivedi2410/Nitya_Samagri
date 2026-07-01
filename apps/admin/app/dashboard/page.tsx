@@ -1,5 +1,5 @@
 import { useState } from "react";
- 
+
 // ─── THEME: Obsidian + Saffron — dark professional with warm accent ───────────
 const C = {
   bg:         "#0D0D0F",
@@ -28,7 +28,7 @@ const C = {
   borderLight:"#2E2E34",
   white:      "#FFFFFF",
 };
- 
+
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 const OVERVIEW_STATS = [
   { label:"Revenue (Month)",   value:"₹4.82L",  sub:"+18% vs May",   trend:+18, icon:"💰", color:C.saffron,  bg:C.saffronBg },
@@ -38,7 +38,7 @@ const OVERVIEW_STATS = [
   { label:"Avg Order Value",   value:"₹876",    sub:"+₹42 vs May",  trend:+5,  icon:"📊", color:C.marigold, bg:C.marigoldBg},
   { label:"Pending Orders",    value:"87",      sub:"15 urgent",     trend:-3,  icon:"⏳", color:C.red,      bg:C.redBg     },
 ];
- 
+
 const REVENUE_CHART = [
   { month:"Jan", rev:420000, orders:520  },
   { month:"Feb", rev:510000, orders:640  },
@@ -47,7 +47,7 @@ const REVENUE_CHART = [
   { month:"May", rev:408000, orders:510  },
   { month:"Jun", rev:482000, orders:612  },
 ];
- 
+
 const ORDER_STATUS_DIST = [
   { label:"Pending",        count:87,  color:C.marigold },
   { label:"Confirmed",      count:143, color:C.blue     },
@@ -56,7 +56,7 @@ const ORDER_STATUS_DIST = [
   { label:"Delivered",      count:645, color:C.green    },
   { label:"Cancelled",      count:39,  color:C.red      },
 ];
- 
+
 const RECENT_ORDERS = [
   { id:"#ORD-2026-1999", customer:"Rahul Sharma",    city:"Delhi",   amount:798,  status:"Shipped",   payment:"UPI",       items:2, time:"10:32 AM", icon:"🫙" },
   { id:"#ORD-2026-1998", customer:"Priya Verma",     city:"Jaipur",  amount:499,  status:"Delivered", payment:"Razorpay",  items:1, time:"9:15 AM",  icon:"🪔" },
@@ -67,7 +67,7 @@ const RECENT_ORDERS = [
   { id:"#ORD-2026-1993", customer:"Rohit Sharma",    city:"Agra",    amount:1599, status:"Shipped",   payment:"Card",      items:4, time:"7:12 AM",  icon:"🪷" },
   { id:"#ORD-2026-1992", customer:"Kavita Joshi",    city:"Delhi",   amount:549,  status:"Delivered", payment:"Razorpay",  items:2, time:"6:58 AM",  icon:"🕯️" },
 ];
- 
+
 const USERS = [
   { id:"C001", name:"Rahul Sharma",  email:"rahul@gmail.com",   phone:"+91 98765 43210", city:"Delhi",   orders:18, spend:14820, status:"Active",   tier:"Gold",     joined:"Mar 2024", lastOrder:"28 May 2026", avatar:"R" },
   { id:"C002", name:"Priya Verma",   email:"priya@gmail.com",   phone:"+91 87654 32109", city:"Jaipur",  orders:7,  spend:5420,  status:"Active",   tier:"Silver",   joined:"Jun 2024", lastOrder:"31 May 2026", avatar:"P" },
@@ -77,7 +77,7 @@ const USERS = [
   { id:"C006", name:"Neha Agarwal",  email:"neha@gmail.com",    phone:"+91 43210 98765", city:"Delhi",   orders:11, spend:8900,  status:"Active",   tier:"Silver",   joined:"Nov 2023", lastOrder:"28 May 2026", avatar:"N" },
   { id:"C007", name:"Rohit Mehta",   email:"rohit@gmail.com",   phone:"+91 32109 87654", city:"Agra",    orders:5,  spend:3200,  status:"Blocked",  tier:"Silver",   joined:"Feb 2024", lastOrder:"15 Apr 2026", avatar:"R" },
 ];
- 
+
 const CATEGORY_PERF = [
   { name:"Puja Samagri", rev:182000, orders:420, pct:38, color:C.saffron  },
   { name:"Ghee & Oils",  rev:124000, orders:310, pct:26, color:C.marigold },
@@ -85,7 +85,7 @@ const CATEGORY_PERF = [
   { name:"Idols",        rev:52000,  orders:112, pct:11, color:C.blue     },
   { name:"Sugandhit",    rev:35000,  orders:88,  pct:7,  color:C.purple   },
 ];
- 
+
 const TOP_PRODUCTS = [
   { name:"Pure Cow Ghee 500ml",  sold:1240, rev:370760, icon:"🫙", trend:+15 },
   { name:"Hawan Samagri Kit",    sold:892,  rev:445108, icon:"🪔", trend:+22 },
@@ -93,14 +93,14 @@ const TOP_PRODUCTS = [
   { name:"Navratri Puja Kit",    sold:412,  rev:329588, icon:"🪷", trend:+31 },
   { name:"Tulsi Mala 108 Beads", sold:389,  rev:57961,  icon:"📿", trend:-4  },
 ];
- 
+
 const ALERTS = [
   { type:"danger",  msg:"Cow Ghee 500ml — stock below 10 units",   time:"2 min ago" },
   { type:"warning", msg:"Order #ORD-1847 pending > 48 hours",       time:"1 hr ago"  },
   { type:"danger",  msg:"3 payment failures in last 30 minutes",    time:"32 min ago"},
   { type:"info",    msg:"Navratri campaign starts in 3 days",       time:"Today"     },
 ];
- 
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const STATUS_CFG = {
   Pending:   { color:C.marigold, bg:C.marigoldBg },
@@ -119,16 +119,16 @@ const TIER_CFG = {
   Gold:     { color:C.gold,     bg:C.goldBg     },
   Platinum: { color:C.purple,   bg:C.purpleBg   },
 };
- 
+
 function SBadge({ label, cfg }) {
   const s = cfg[label] || { color:C.textMid, bg:C.bgElevated };
   return <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:s.bg, color:s.color, fontSize:10, fontWeight:700, padding:"3px 9px", borderRadius:999 }}><span style={{ width:5, height:5, borderRadius:"50%", background:s.color }}/>{label}</span>;
 }
- 
+
 function Card({ children, style={} }) {
   return <div style={{ background:C.bgCard, borderRadius:14, border:`1px solid ${C.border}`, ...style }}>{children}</div>;
 }
- 
+
 function SectionTitle({ title, sub, action }) {
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
@@ -140,19 +140,19 @@ function SectionTitle({ title, sub, action }) {
     </div>
   );
 }
- 
+
 function TH({ children }) {
   return <th style={{ padding:"10px 14px", fontSize:10, fontWeight:700, color:C.textLight, textAlign:"left", textTransform:"uppercase", letterSpacing:0.8, borderBottom:`1px solid ${C.border}`, whiteSpace:"nowrap" }}>{children}</th>;
 }
 function TD({ children, bold, color }) {
   return <td style={{ padding:"12px 14px", fontSize:13, color:color||C.text, fontWeight:bold?700:400, whiteSpace:"nowrap", borderBottom:`1px solid ${C.border}` }}>{children}</td>;
 }
- 
+
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
 function OverviewView() {
   const maxRev = Math.max(...REVENUE_CHART.map(r=>r.rev));
   const totalOrders = ORDER_STATUS_DIST.reduce((s,o)=>s+o.count,0);
- 
+
   return (
     <div>
       {/* KPI grid */}
@@ -167,7 +167,7 @@ function OverviewView() {
           </Card>
         ))}
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:20, marginBottom:20 }}>
         {/* Revenue bar chart */}
         <Card style={{ padding:"24px" }}>
@@ -197,7 +197,7 @@ function OverviewView() {
             })}
           </div>
         </Card>
- 
+
         {/* Order status donut */}
         <Card style={{ padding:"24px" }}>
           <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text, marginBottom:20 }}>Order Status</div>
@@ -221,7 +221,7 @@ function OverviewView() {
           </div>
         </Card>
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:20 }}>
         {/* Top products */}
         <Card style={{ padding:"22px" }}>
@@ -240,7 +240,7 @@ function OverviewView() {
             ))}
           </div>
         </Card>
- 
+
         {/* Category performance */}
         <Card style={{ padding:"22px" }}>
           <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text, marginBottom:16 }}>Category Performance</div>
@@ -262,7 +262,7 @@ function OverviewView() {
           </div>
         </Card>
       </div>
- 
+
       {/* Alerts panel */}
       <Card style={{ padding:"20px" }}>
         <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text, marginBottom:14 }}>🔔 System Alerts</div>
@@ -281,7 +281,7 @@ function OverviewView() {
     </div>
   );
 }
- 
+
 // ─── ORDERS ───────────────────────────────────────────────────────────────────
 function OrdersView() {
   const [search,   setSearch]   = useState("");
@@ -289,7 +289,7 @@ function OrdersView() {
   const [selected, setSelected] = useState(null);
   const [page,     setPage]     = useState(1);
   const PER_PAGE = 6;
- 
+
   const statuses = ["All","Pending","Confirmed","Packed","Shipped","Delivered","Cancelled"];
   const filtered = RECENT_ORDERS.filter(o=>{
     if(filter!=="All" && o.status!==filter) return false;
@@ -298,7 +298,7 @@ function OrdersView() {
   });
   const paginated = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
   const totalPages = Math.ceil(filtered.length/PER_PAGE);
- 
+
   return (
     <div>
       <SectionTitle title="Order Management" sub={`${filtered.length} orders found`}
@@ -309,7 +309,7 @@ function OrdersView() {
           </div>
         }
       />
- 
+
       {/* Search + filters */}
       <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search order ID or customer…"
@@ -320,13 +320,13 @@ function OrdersView() {
         </select>
         <input type="date" style={{ padding:"9px 14px", borderRadius:9, border:`1px solid ${C.border}`, fontSize:13, color:C.text, background:C.bgElevated, outline:"none", colorScheme:"dark" }}/>
       </div>
- 
+
       <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
         {statuses.map(s=>(
           <button key={s} onClick={()=>{setFilter(s);setPage(1);}} style={{ padding:"6px 14px", borderRadius:999, border:`1.5px solid ${filter===s?(STATUS_CFG[s]||{color:C.saffron}).color:C.border}`, background:filter===s?`${(STATUS_CFG[s]||{bg:C.saffronBg}).bg}`:"transparent", color:filter===s?(STATUS_CFG[s]||{color:C.saffron}).color:C.textMid, fontWeight:600, fontSize:11, cursor:"pointer", transition:"all 0.15s" }}>{s}</button>
         ))}
       </div>
- 
+
       {/* Table */}
       <Card style={{ overflow:"hidden", marginBottom:16 }}>
         <div style={{ overflowX:"auto" }}>
@@ -366,7 +366,7 @@ function OrdersView() {
           </table>
         </div>
       </Card>
- 
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display:"flex", justifyContent:"center", gap:8 }}>
@@ -375,7 +375,7 @@ function OrdersView() {
           ))}
         </div>
       )}
- 
+
       {/* Order detail drawer */}
       {selected && (
         <Card style={{ padding:"22px", marginTop:16 }}>
@@ -401,33 +401,33 @@ function OrdersView() {
     </div>
   );
 }
- 
+
 // ─── USERS ────────────────────────────────────────────────────────────────────
 function UsersView() {
   const [search,   setSearch]   = useState("");
   const [selected, setSelected] = useState(null);
   const [tierFilter, setTierFilter] = useState("All");
- 
+
   const tiers = ["All","New","Silver","Gold","Platinum","Blocked"];
   const filtered = USERS.filter(u=>{
     if(tierFilter!=="All" && (u.tier!==tierFilter && u.status!==tierFilter)) return false;
     if(search && !u.name.toLowerCase().includes(search.toLowerCase()) && !u.email.includes(search)) return false;
     return true;
   });
- 
+
   const userStats = [
     { label:"Total Customers",  value:USERS.length,                          color:C.blue    },
     { label:"Active",           value:USERS.filter(u=>u.status==="Active").length, color:C.green },
     { label:"New This Month",   value:2,                                      color:C.saffron },
     { label:"Blocked",          value:USERS.filter(u=>u.status==="Blocked").length, color:C.red },
   ];
- 
+
   return (
     <div>
       <SectionTitle title="User Management" sub={`${filtered.length} customers`}
         action={<button style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${C.border}`, background:"transparent", color:C.textMid, fontSize:12, fontWeight:600, cursor:"pointer" }}>📥 Export Users</button>}
       />
- 
+
       {/* Mini stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
         {userStats.map(s=>(
@@ -439,7 +439,7 @@ function UsersView() {
           </Card>
         ))}
       </div>
- 
+
       {/* Filters */}
       <div style={{ display:"flex", gap:10, marginBottom:14, flexWrap:"wrap" }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search name or email…"
@@ -450,7 +450,7 @@ function UsersView() {
           ))}
         </div>
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:selected?"1fr 340px":"1fr", gap:20 }}>
         {/* Table */}
         <Card style={{ overflow:"hidden" }}>
@@ -496,7 +496,7 @@ function UsersView() {
             </tbody>
           </table>
         </Card>
- 
+
         {/* User detail */}
         {selected && (
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -533,12 +533,12 @@ function UsersView() {
     </div>
   );
 }
- 
+
 // ─── REPORTS ──────────────────────────────────────────────────────────────────
 function ReportsView() {
   const [range, setRange] = useState("This Month");
   const ranges = ["Today","This Week","This Month","This Year"];
- 
+
   const reportCards = [
     { title:"Sales Report",      icon:"📈", desc:"Revenue, orders, AOV, growth trends",        color:C.saffron  },
     { title:"Inventory Report",  icon:"📦", desc:"Stock levels, low stock, valuation",          color:C.blue     },
@@ -549,7 +549,7 @@ function ReportsView() {
     { title:"Payment Report",    icon:"💳", desc:"UPI, COD, card split, failed payments",       color:C.red      },
     { title:"Coupon Report",     icon:"🏷️", desc:"Usage, discount given, conversion rates",     color:C.blue     },
   ];
- 
+
   const kpis = [
     { label:"Gross Revenue",    value:"₹4.82L",  sub:"Jun 2026",    color:C.saffron  },
     { label:"Net Revenue",      value:"₹4.51L",  sub:"After refunds",color:C.green   },
@@ -558,13 +558,13 @@ function ReportsView() {
     { label:"Cart Abandonment", value:"34.8%",   sub:"↓ 3% vs May",  color:C.marigold},
     { label:"Repeat Rate",      value:"42.3%",   sub:"Target: 45%",  color:C.purple  },
   ];
- 
+
   const gstData = [
     { month:"Apr", cgst:24000, sgst:24000, igst:18000 },
     { month:"May", cgst:21000, sgst:21000, igst:14000 },
     { month:"Jun", cgst:28000, sgst:28000, igst:19000 },
   ];
- 
+
   return (
     <div>
       <SectionTitle title="Reports & Analytics" sub="Business intelligence across all modules"
@@ -579,7 +579,7 @@ function ReportsView() {
           </div>
         }
       />
- 
+
       {/* KPI summary row */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12, marginBottom:24 }}>
         {kpis.map(k=>(
@@ -590,7 +590,7 @@ function ReportsView() {
           </Card>
         ))}
       </div>
- 
+
       {/* Report cards grid */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
         {reportCards.map(r=>(
@@ -607,7 +607,7 @@ function ReportsView() {
           </div>
         ))}
       </div>
- 
+
       {/* GST summary + payment split */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
         {/* GST table */}
@@ -643,7 +643,7 @@ function ReportsView() {
             <button style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${C.border}`, background:"transparent", color:C.textMid, fontWeight:600, fontSize:12, cursor:"pointer" }}>📧 Email to CA</button>
           </div>
         </Card>
- 
+
         {/* Payment split */}
         <Card style={{ padding:"22px" }}>
           <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text, marginBottom:16 }}>Payment Method Split — {range}</div>
@@ -676,7 +676,7 @@ function ReportsView() {
     </div>
   );
 }
- 
+
 // ─── NAV + ROOT ───────────────────────────────────────────────────────────────
 const NAV = [
   { id:"overview", label:"Overview",  icon:"📊" },
@@ -684,7 +684,7 @@ const NAV = [
   { id:"users",    label:"Users",     icon:"👥" },
   { id:"reports",  label:"Reports",   icon:"📈" },
 ];
- 
+
 const SIDEBAR_NAV = [
   { group:"Core", items:[
     { id:"overview",  label:"Overview",     icon:"📊" },
@@ -703,13 +703,13 @@ const SIDEBAR_NAV = [
     { id:"logs",      label:"Audit Logs",   icon:"📋", disabled:true },
   ]},
 ];
- 
+
 export default function AdminDashboard() {
   const [view, setView] = useState("overview");
- 
+
   return (
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI','Helvetica Neue',sans-serif", color:C.text, display:"flex" }}>
- 
+
       {/* Sidebar */}
       <div style={{ width:220, flexShrink:0, background:C.bgCard, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", position:"sticky", top:0, height:"100vh", overflowY:"auto" }}>
         {/* Logo */}
@@ -722,7 +722,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
- 
+
         {/* Nav groups */}
         <div style={{ flex:1, padding:"12px 10px" }}>
           {SIDEBAR_NAV.map(group=>(
@@ -738,7 +738,7 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
- 
+
         {/* Admin profile */}
         <div style={{ padding:"14px 16px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -750,7 +750,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
- 
+
       {/* Main */}
       <div style={{ flex:1, overflow:"auto" }}>
         {/* Top bar */}
@@ -772,7 +772,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
- 
+
         {/* Content */}
         <div style={{ padding:"28px 24px" }}>
           {view==="overview" && <OverviewView/>}
@@ -784,5 +784,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-

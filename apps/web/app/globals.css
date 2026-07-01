@@ -1,0 +1,190 @@
+/* apps/web/app/globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Variables — KhatuMart Brand ─────────────────────────────────────── */
+:root {
+  --saffron:        #E8560A;
+  --saffron-dark:   #B8400A;
+  --saffron-light:  #F47B3A;
+  --saffron-bg:     #FFF3EC;
+  --marigold:       #F5A623;
+  --marigold-light: #FAC65A;
+  --gold:           #C8860A;
+  --gold-bg:        #FFF8E8;
+  --cream:          #FFF8EE;
+  --cream-dark:     #F0E4CE;
+  --bark:           #5C3317;
+  --bark-light:     #7A4A28;
+  --text:           #2C1A0E;
+  --text-mid:       #5C3D20;
+  --text-light:     #9A7050;
+  --green:          #1A7A3C;
+  --green-bg:       #EDFAF3;
+  --red:            #C0392B;
+  --red-bg:         #FFF0EE;
+  --border:         #E8D8BC;
+  --white:          #FFFFFF;
+}
+
+/* ── Base reset ──────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin:     0;
+  padding:    0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family:        var(--font-inter), 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background-color:   var(--cream);
+  color:              var(--text);
+  line-height:        1.6;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 700;
+  line-height: 1.2;
+  color:       var(--text);
+}
+
+p {
+  line-height: 1.7;
+  color:       var(--text-mid);
+}
+
+a {
+  color:           var(--saffron);
+  text-decoration: none;
+  transition:      color 0.2s ease;
+}
+
+a:hover {
+  color: var(--saffron-dark);
+}
+
+/* ── Focus styles ────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline:        2px solid var(--saffron);
+  outline-offset: 3px;
+  border-radius:  4px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--cream-dark); }
+::-webkit-scrollbar-thumb { background: var(--saffron-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--saffron); }
+
+/* ── Selection ───────────────────────────────────────────────────────────── */
+::selection {
+  background: var(--saffron-bg);
+  color:      var(--saffron-dark);
+}
+
+/* ── Images ──────────────────────────────────────────────────────────────── */
+img, video {
+  max-width: 100%;
+  height:    auto;
+  display:   block;
+}
+
+/* ── Buttons base ────────────────────────────────────────────────────────── */
+button {
+  font-family: inherit;
+  cursor:      pointer;
+  border:      none;
+  background:  none;
+}
+
+button:disabled {
+  cursor:  not-allowed;
+  opacity: 0.6;
+}
+
+/* ── Inputs base ─────────────────────────────────────────────────────────── */
+input, textarea, select {
+  font-family: inherit;
+  font-size:   inherit;
+  color:       var(--text);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+
+/* ── Utility classes ─────────────────────────────────────────────────────── */
+.font-serif {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+.text-saffron   { color: var(--saffron);    }
+.text-marigold  { color: var(--marigold);   }
+.text-gold      { color: var(--gold);       }
+.text-bark      { color: var(--bark);       }
+.bg-cream       { background: var(--cream); }
+.bg-saffron     { background: var(--saffron); }
+.bg-saffron-bg  { background: var(--saffron-bg); }
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { transform: scale(1.1);             }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.animate-fade-up    { animation: fadeUp    0.5s ease forwards; }
+.animate-fade-in    { animation: fadeIn    0.3s ease forwards; }
+.animate-spin       { animation: spin      0.8s linear infinite; }
+.animate-pulse      { animation: pulse     2s ease-in-out infinite; }
+.animate-slide-down { animation: slideDown 0.2s ease forwards; }
+.animate-bounce-in  { animation: bounceIn  0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+/* ── Screen reader only ──────────────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width:    1px;
+  height:   1px;
+  padding:  0;
+  margin:   -1px;
+  overflow: hidden;
+  clip:     rect(0,0,0,0);
+  border:   0;
+}

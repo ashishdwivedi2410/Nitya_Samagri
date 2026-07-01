@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .github/workflows/deploy-admin.yml
+# Triggers: push to main affecting apps/admin/ or apps/pandit/
+# Deploys both admin and pandit panels to Vercel
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: 🛠️ Deploy Admin & Pandit Panels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - "apps/pandit/**"
+      - ".github/workflows/deploy-admin.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - "apps/pandit/**"
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Admin Panel ─────────────────────────────────────────────────────────────
+  deploy-admin:
+    name: 🛠️ Deploy Admin Panel
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://admin.thekhatumart.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: apps/admin
+
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: apps/admin
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy Admin to Vercel
+        run: |
+          vercel pull --yes --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/admin
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.thekhatumart.com/api/v1
+          NEXT_PUBLIC_WS_URL:  wss://api.thekhatumart.com/ws
+
+      - name: Verify Admin deployment
+        run: |
+          sleep 10
+          curl -sf https://admin.thekhatumart.com || exit 1
+          echo "✅ Admin panel live"
+
+  # ── Pandit Panel ─────────────────────────────────────────────────────────────
+  deploy-pandit:
+    name: 🙏 Deploy Pandit Panel
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://pandit.thekhatumart.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/pandit/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: apps/pandit
+
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: apps/pandit
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy Pandit to Vercel
+        run: |
+          vercel pull --yes --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/pandit
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PANDIT_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.thekhatumart.com/api/v1
+          NEXT_PUBLIC_WS_URL:  wss://api.thekhatumart.com/ws
+
+      - name: Verify Pandit deployment
+        run: |
+          sleep 10
+          curl -sf https://pandit.thekhatumart.com || exit 1
+          echo "✅ Pandit panel live"

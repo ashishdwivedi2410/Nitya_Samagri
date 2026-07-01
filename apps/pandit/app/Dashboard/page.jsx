@@ -1,5 +1,5 @@
 import { useState } from "react";
- 
+
 // ─── THEME — Deep Vedic: dark saffron + ivory + gold on warm charcoal ─────────
 const C = {
   bg:        "#1C1008",
@@ -28,7 +28,7 @@ const C = {
   border:    "#3A2510",
   borderLight:"#4A3218",
 };
- 
+
 const pandit = {
   name:     "Pt. Ramesh Sharma",
   avatar:   "🧘",
@@ -41,11 +41,11 @@ const pandit = {
   phone:    "+91 98765 43210",
   status:   "available",
 };
- 
+
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAYS   = ["S","M","T","W","T","F","S"];
 const FULL_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
- 
+
 const bookings = [
   { id:"#BK-0901", customer:"Priya Verma",   ceremony:"Satyanarayan Katha", date:"2 Jun 2026",  time:"08:00 AM", city:"Delhi",   amount:2500, status:"Confirmed",  avatar:"P", samagri:"Platform" },
   { id:"#BK-0902", customer:"Amit Gupta",    ceremony:"Griha Pravesh",      date:"5 Jun 2026",  time:"10:00 AM", city:"Noida",   amount:3500, status:"Pending",    avatar:"A", samagri:"Customer" },
@@ -55,7 +55,7 @@ const bookings = [
   { id:"#BK-0906", customer:"Rohit Mehta",   ceremony:"Vastu Puja",         date:"18 May 2026", time:"11:00 AM", city:"Faridabad",amount:2000,status:"Completed",  avatar:"R", samagri:"Customer" },
   { id:"#BK-0907", customer:"Kavita Sharma", ceremony:"Satyanarayan Katha", date:"10 May 2026", time:"08:00 AM", city:"Delhi",   amount:2500, status:"Cancelled",  avatar:"K", samagri:"Platform" },
 ];
- 
+
 const earningsData = {
   thisMonth: 18500,
   lastMonth: 14200,
@@ -75,16 +75,16 @@ const earningsData = {
     { id:"PO-003", date:"1 Apr 2026",  amount:13500, method:"Bank Transfer", status:"Completed" },
   ],
 };
- 
+
 const BLOCKED_DATES = [3,4,10,17,24]; // June 2026
- 
+
 const STATUS_CFG = {
   Confirmed:  { color:C.green,    bg:C.greenBg,    dot:C.green,    icon:"✓"  },
   Pending:    { color:C.marigold, bg:C.marigoldBg, dot:C.marigold, icon:"⏳" },
   Completed:  { color:C.gold,     bg:C.goldBg,     dot:C.gold,     icon:"🏅" },
   Cancelled:  { color:C.red,      bg:C.redBg,      dot:C.red,      icon:"✕"  },
 };
- 
+
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 function Badge({ status }) {
   const s = STATUS_CFG[status] || STATUS_CFG.Pending;
@@ -95,11 +95,11 @@ function Badge({ status }) {
     </span>
   );
 }
- 
+
 function Card({ children, style={} }) {
   return <div style={{ background:C.bgCard, borderRadius:16, border:`1px solid ${C.border}`, ...style }}>{children}</div>;
 }
- 
+
 function StatCard({ icon, label, value, sub, color=C.saffron, trend }) {
   return (
     <Card style={{ padding:"20px", position:"relative", overflow:"hidden" }}>
@@ -112,7 +112,7 @@ function StatCard({ icon, label, value, sub, color=C.saffron, trend }) {
     </Card>
   );
 }
- 
+
 function SectionTitle({ title, sub }) {
   return (
     <div style={{ marginBottom:20 }}>
@@ -121,12 +121,12 @@ function SectionTitle({ title, sub }) {
     </div>
   );
 }
- 
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function DashboardView({ setView }) {
   const todayBk   = bookings.filter(b => b.status==="Confirmed").slice(0,2);
   const pendingBk = bookings.filter(b => b.status==="Pending");
- 
+
   return (
     <div>
       {/* Hero welcome */}
@@ -150,7 +150,7 @@ function DashboardView({ setView }) {
           </div>
         </div>
       </div>
- 
+
       {/* Stat cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
         <StatCard icon="📅" label="Today's Bookings" value={todayBk.length}  sub="Upcoming today"          color={C.saffron}  trend={25} />
@@ -158,7 +158,7 @@ function DashboardView({ setView }) {
         <StatCard icon="✅" label="Completed Pujas"  value={bookings.filter(b=>b.status==="Completed").length} sub="All time"  color={C.gold} />
         <StatCard icon="⭐" label="Avg Rating"       value={`${pandit.rating}/5`} sub={`${pandit.reviews} reviews`} color={C.gold} />
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:20 }}>
         {/* Upcoming bookings */}
         <Card style={{ padding:"22px" }}>
@@ -182,7 +182,7 @@ function DashboardView({ setView }) {
             ))}
           </div>
         </Card>
- 
+
         {/* Right column */}
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           {/* Pending actions */}
@@ -201,7 +201,7 @@ function DashboardView({ setView }) {
               ))}
             </Card>
           )}
- 
+
           {/* Quick stats */}
           <Card style={{ padding:"18px" }}>
             <div style={{ fontFamily:"'Georgia',serif", fontSize:15, color:C.text, marginBottom:14 }}>This Month</div>
@@ -217,7 +217,7 @@ function DashboardView({ setView }) {
               </div>
             ))}
           </Card>
- 
+
           {/* Earnings snapshot */}
           <Card style={{ padding:"18px", background:`linear-gradient(135deg, ${C.goldBg}, ${C.bgCard})` }}>
             <div style={{ fontSize:11, color:C.gold, fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:0.8 }}>💰 Pending Payout</div>
@@ -230,26 +230,26 @@ function DashboardView({ setView }) {
     </div>
   );
 }
- 
+
 // ─── BOOKINGS ─────────────────────────────────────────────────────────────────
 function BookingsView() {
   const [filter, setFilter]   = useState("All");
   const [selected, setSelected] = useState(null);
   const filters = ["All","Confirmed","Pending","Completed","Cancelled"];
- 
+
   const filtered = filter==="All" ? bookings : bookings.filter(b=>b.status===filter);
- 
+
   return (
     <div>
       <SectionTitle title="My Bookings" sub={`${bookings.length} total bookings`}/>
- 
+
       {/* Filter tabs */}
       <div style={{ display:"flex", gap:6, marginBottom:20, flexWrap:"wrap" }}>
         {filters.map(f=>(
           <button key={f} onClick={()=>setFilter(f)} style={{ padding:"7px 16px", borderRadius:999, border:`1.5px solid ${filter===f?C.saffron:C.border}`, background:filter===f?C.saffron:"transparent", color:filter===f?C.white:C.textMid, fontWeight:600, fontSize:12, cursor:"pointer", transition:"all 0.15s" }}>{f}</button>
         ))}
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns: selected ? "1fr 360px" : "1fr", gap:20 }}>
         {/* Booking list */}
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -275,7 +275,7 @@ function BookingsView() {
                   <div style={{ fontSize:11, color:C.textLight }}>{b.id}</div>
                 </div>
               </div>
- 
+
               {/* Pending quick actions inline */}
               {b.status==="Pending" && (
                 <div style={{ display:"flex", gap:10, marginTop:12, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
@@ -287,7 +287,7 @@ function BookingsView() {
           ))}
           {filtered.length===0 && <div style={{ textAlign:"center", padding:"40px 0", color:C.textLight, fontSize:14 }}>No {filter.toLowerCase()} bookings.</div>}
         </div>
- 
+
         {/* Detail panel */}
         {selected && (
           <Card style={{ padding:"22px", position:"sticky", top:20, alignSelf:"start" }}>
@@ -295,7 +295,7 @@ function BookingsView() {
               <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text }}>Booking Details</div>
               <button onClick={()=>setSelected(null)} style={{ background:"none", border:"none", color:C.textLight, fontSize:18, cursor:"pointer" }}>✕</button>
             </div>
- 
+
             {/* Customer */}
             <div style={{ display:"flex", gap:12, alignItems:"center", background:C.bgLight, borderRadius:12, padding:"14px", marginBottom:16 }}>
               <div style={{ width:44, height:44, borderRadius:"50%", background:C.saffronBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700, color:C.saffron }}>{selected.avatar}</div>
@@ -304,7 +304,7 @@ function BookingsView() {
                 <div style={{ fontSize:12, color:C.textLight }}>{selected.city}</div>
               </div>
             </div>
- 
+
             {[
               ["Ceremony",  selected.ceremony],
               ["Date",      selected.date],
@@ -318,7 +318,7 @@ function BookingsView() {
                 <span style={{ fontWeight:600, color:C.text }}>{v}</span>
               </div>
             ))}
- 
+
             <div style={{ borderTop:`1px solid ${C.border}`, marginTop:16, paddingTop:16 }}>
               <div style={{ fontSize:12, fontWeight:700, color:C.textMid, marginBottom:10, textTransform:"uppercase", letterSpacing:0.6 }}>Actions</div>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -341,7 +341,7 @@ function BookingsView() {
     </div>
   );
 }
- 
+
 // ─── AVAILABILITY ─────────────────────────────────────────────────────────────
 function AvailabilityView() {
   const today = new Date(2026,5,1); // June 2026
@@ -352,11 +352,11 @@ function AvailabilityView() {
   const [workDays,  setWorkDays]  = useState(new Set([1,2,3,4,5,6])); // Mon-Sat
   const [selDate,   setSelDate]   = useState(null);
   const [unavailToday, setUnavailToday] = useState(false);
- 
+
   const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
   const cells       = Array(firstDay).fill(null).concat(Array.from({length:daysInMonth},(_,i)=>i+1));
- 
+
   const isBlocked  = d => blocked.has(d);
   const isPast     = d => new Date(viewYear,viewMonth,d) < new Date(today.getFullYear(),today.getMonth(),today.getDate());
   const isToday    = d => d===today.getDate() && viewMonth===today.getMonth() && viewYear===today.getFullYear();
@@ -364,24 +364,24 @@ function AvailabilityView() {
   const hasBooking = d => bookings.some(b=>b.date===`${d} ${MONTHS[viewMonth]} ${viewYear}`);
   const dayOfWeek  = d => new Date(viewYear,viewMonth,d).getDay();
   const isOffDay   = d => !workDays.has(dayOfWeek(d));
- 
+
   const toggleBlock = d => {
     if(isPast(d)||hasBooking(d)) return;
     setBlocked(prev => { const n=new Set(prev); n.has(d)?n.delete(d):n.add(d); return n; });
     setSelDate(d);
   };
- 
+
   const prevM = () => viewMonth===0 ? (setViewMonth(11),setViewYear(y=>y-1)) : setViewMonth(m=>m-1);
   const nextM = () => viewMonth===11? (setViewMonth(0), setViewYear(y=>y+1)) : setViewMonth(m=>m+1);
- 
+
   const toggleWorkDay = d => setWorkDays(prev=>{ const n=new Set(prev); n.has(d)?n.delete(d):n.add(d); return n; });
- 
+
   const bookedDates = bookings.filter(b=>b.status==="Confirmed"||b.status==="Pending").length;
- 
+
   return (
     <div>
       <SectionTitle title="Availability Calendar" sub="Manage your schedule and block dates"/>
- 
+
       {/* Emergency toggle */}
       <div style={{ background:unavailToday?C.redBg:C.bgCard, border:`1px solid ${unavailToday?C.red:C.border}`, borderRadius:14, padding:"14px 18px", marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div>
@@ -392,7 +392,7 @@ function AvailabilityView() {
           <div style={{ position:"absolute", top:3, left:unavailToday?24:3, width:20, height:20, borderRadius:"50%", background:C.white, transition:"left 0.2s" }}/>
         </div>
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:24 }}>
         {/* Calendar */}
         <Card style={{ padding:22 }}>
@@ -401,14 +401,14 @@ function AvailabilityView() {
             <span style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:17, color:C.text }}>{MONTHS[viewMonth]} {viewYear}</span>
             <button onClick={nextM} style={{ width:32, height:32, border:"none", background:C.bgLight, borderRadius:8, cursor:"pointer", fontSize:15, color:C.textMid }}>›</button>
           </div>
- 
+
           {/* Day headers */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:8 }}>
             {FULL_DAYS.map((d,i)=>(
               <div key={d} style={{ textAlign:"center", fontSize:11, color:i===0?C.red:C.textLight, fontWeight:700, padding:"4px 0" }}>{d}</div>
             ))}
           </div>
- 
+
           {/* Cells */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4 }}>
             {cells.map((d,i)=>{
@@ -430,7 +430,7 @@ function AvailabilityView() {
               );
             })}
           </div>
- 
+
           {/* Legend */}
           <div style={{ display:"flex", gap:14, marginTop:14, paddingTop:12, borderTop:`1px solid ${C.border}`, flexWrap:"wrap" }}>
             {[["🟠","Selected"],[`rgba(212,160,23,0.3)`,"Has Booking",C.gold],["transparent","Available",C.saffron],["redBg","Blocked",C.red]].map(([_,label,color])=>(
@@ -441,7 +441,7 @@ function AvailabilityView() {
             ))}
           </div>
         </Card>
- 
+
         {/* Settings panel */}
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {/* Work days */}
@@ -453,7 +453,7 @@ function AvailabilityView() {
               ))}
             </div>
           </Card>
- 
+
           {/* Work hours */}
           <Card style={{ padding:"18px" }}>
             <div style={{ fontFamily:"'Georgia',serif", fontSize:15, color:C.text, marginBottom:14 }}>Working Hours</div>
@@ -466,7 +466,7 @@ function AvailabilityView() {
               ))}
             </div>
           </Card>
- 
+
           {/* Monthly summary */}
           <Card style={{ padding:"18px" }}>
             <div style={{ fontFamily:"'Georgia',serif", fontSize:15, color:C.text, marginBottom:14 }}>June Summary</div>
@@ -483,16 +483,16 @@ function AvailabilityView() {
     </div>
   );
 }
- 
+
 // ─── EARNINGS ─────────────────────────────────────────────────────────────────
 function EarningsView() {
   const maxAmt = Math.max(...earningsData.monthly.map(m=>m.amt));
   const growth = Math.round(((earningsData.thisMonth - earningsData.lastMonth) / earningsData.lastMonth) * 100);
- 
+
   return (
     <div>
       <SectionTitle title="Earnings & Payouts" sub="Track your income and payout history"/>
- 
+
       {/* Top stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
         <StatCard icon="💰" label="This Month"  value={`₹${earningsData.thisMonth.toLocaleString()}`}  trend={growth} color={C.saffron}/>
@@ -500,7 +500,7 @@ function EarningsView() {
         <StatCard icon="📈" label="This Year"   value={`₹${(earningsData.thisYear/100000).toFixed(1)}L`} sub="Total 2026"  color={C.gold}/>
         <StatCard icon="⏳" label="Pending"     value={`₹${earningsData.pending.toLocaleString()}`}    sub="Next: 1 Jul" color={C.marigold}/>
       </div>
- 
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:20 }}>
         {/* Bar chart */}
         <Card style={{ padding:"24px" }}>
@@ -518,7 +518,7 @@ function EarningsView() {
               );
             })}
           </div>
- 
+
           {/* Breakdown */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginTop:24, paddingTop:20, borderTop:`1px solid ${C.border}` }}>
             {[["Pandit Charges","₹16,000","86%",C.saffron],["Platform Fee (10%)","–₹1,850","–",C.red],["Net Earnings","₹14,650","79%",C.green]].map(([k,v,pct,color])=>(
@@ -529,7 +529,7 @@ function EarningsView() {
             ))}
           </div>
         </Card>
- 
+
         {/* Payout history + bank */}
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           <Card style={{ padding:"18px" }}>
@@ -545,7 +545,7 @@ function EarningsView() {
             ))}
             <button style={{ width:"100%", padding:"9px", borderRadius:9, border:`1px solid ${C.border}`, background:"transparent", color:C.textMid, fontWeight:600, fontSize:12, cursor:"pointer" }}>View All Payouts →</button>
           </Card>
- 
+
           <Card style={{ padding:"18px" }}>
             <div style={{ fontFamily:"'Georgia',serif", fontSize:15, color:C.text, marginBottom:14 }}>Bank Details</div>
             {[["Account","HDFC Bank · ****4821"],["IFSC","HDFC0001234"],["UPI","ramesh@hdfc"],["Next Payout","1 Jul 2026"]].map(([k,v])=>(
@@ -558,7 +558,7 @@ function EarningsView() {
           </Card>
         </div>
       </div>
- 
+
       {/* Booking-wise earnings */}
       <Card style={{ padding:"22px", marginTop:20 }}>
         <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:C.text, marginBottom:16 }}>Booking-wise Earnings — June 2026</div>
@@ -579,7 +579,7 @@ function EarningsView() {
     </div>
   );
 }
- 
+
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV = [
   { id:"dashboard",    label:"Dashboard",   icon:"🏠" },
@@ -587,14 +587,14 @@ const NAV = [
   { id:"availability", label:"Availability",icon:"🗓️" },
   { id:"earnings",     label:"Earnings",    icon:"💰" },
 ];
- 
+
 export default function PanditPanel() {
   const [view,    setView]    = useState("dashboard");
   const [mobileNav, setMobileNav] = useState(false);
- 
+
   return (
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI','Helvetica Neue',sans-serif", color:C.text }}>
- 
+
       {/* Top bar */}
       <nav style={{ background:C.bgCard, borderBottom:`1px solid ${C.border}`, padding:"0 20px", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ maxWidth:1200, margin:"0 auto", height:58, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -604,7 +604,7 @@ export default function PanditPanel() {
             <span style={{ color:C.border, margin:"0 6px" }}>›</span>
             <span style={{ fontSize:13, color:C.textMid }}>Pandit Panel</span>
           </div>
- 
+
           {/* Desktop nav */}
           <div style={{ display:"flex", gap:2 }}>
             {NAV.map(n=>(
@@ -613,7 +613,7 @@ export default function PanditPanel() {
               </button>
             ))}
           </div>
- 
+
           {/* Pandit avatar */}
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ textAlign:"right" }}>
@@ -624,7 +624,7 @@ export default function PanditPanel() {
           </div>
         </div>
       </nav>
- 
+
       {/* Main content */}
       <div style={{ maxWidth:1200, margin:"0 auto", padding:"28px 20px 80px" }}>
         {view==="dashboard"    && <DashboardView    setView={setView}/>}
@@ -632,7 +632,7 @@ export default function PanditPanel() {
         {view==="availability" && <AvailabilityView/>}
         {view==="earnings"     && <EarningsView/>}
       </div>
- 
+
       {/* Mobile bottom nav */}
       <div style={{ position:"fixed", bottom:0, left:0, right:0, background:C.bgCard, borderTop:`1px solid ${C.border}`, display:"flex", zIndex:50, padding:"8px 0 10px" }}>
         {NAV.map(n=>(

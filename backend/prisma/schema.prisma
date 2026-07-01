@@ -1,0 +1,607 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// prisma/schema.prisma — TheKhatuMart full database schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  customer
+  admin
+  super_admin
+  order_manager
+  warehouse
+  support
+  marketing
+  accountant
+  pandit
+}
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+  deleted
+}
+
+enum LoyaltyTier {
+  new
+  silver
+  gold
+  platinum
+}
+
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  packed
+  ready_for_pickup
+  shipped
+  out_for_delivery
+  delivered
+  cancelled
+  returned
+  refunded
+  failed
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+  partially_refunded
+}
+
+enum PaymentMethod {
+  razorpay
+  upi
+  cod
+  card
+  netbanking
+  wallet
+}
+
+enum CouponType {
+  percent
+  flat
+  shipping
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  rejected
+  in_progress
+  completed
+  cancelled
+}
+
+enum SamagriOption {
+  platform
+  pandit
+  customer
+}
+
+enum InventoryOperation {
+  set
+  add
+  subtract
+  return
+  adjustment
+}
+
+// ─── USER ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String      @id @default(uuid())
+  name           String      @default("New User")
+  phone          String      @unique
+  email          String?     @unique
+  password       String?
+  role           UserRole    @default(customer)
+  status         UserStatus  @default(active)
+  isVerified     Boolean     @default(false)
+  loyaltyPoints  Int         @default(0)
+  loyaltyTier    LoyaltyTier @default(new)
+  referralCode   String?     @unique
+  referredBy     String?
+  avatarUrl      String?
+  lastLoginAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  addresses      Address[]
+  orders         Order[]
+  reviews        Review[]
+  wishlistItems  WishlistItem[]
+  loyaltyLogs    LoyaltyLog[]
+  supportTickets SupportTicket[]
+  panditProfile  PanditProfile?
+
+  @@index([phone])
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+// ─── ADDRESS ──────────────────────────────────────────────────────────────────
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  label      String   @default("Home")
+  name       String
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  pin        String
+  country    String   @default("India")
+  isDefault  Boolean  @default(false)
+  lat        Float?
+  lng        Float?
+  createdAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders  Order[]
+
+  @@index([userId])
+}
+
+// ─── CATEGORY ─────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  bannerUrl   String?
+  parentId    String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  seoTitle    String?
+  seoDesc     String?
+  createdAt   DateTime   @default(now())
+
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+// ─── PRODUCT ──────────────────────────────────────────────────────────────────
+
+model Product {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  description  String?       @db.Text
+  shortDesc    String?
+  categoryId   String
+  brandId      String?
+  sku          String        @unique
+  mrp          Float
+  price        Float
+  costPrice    Float?
+  gstPct       Float         @default(5)
+  hsnCode      String?
+  stock        Int           @default(0)
+  lowStockAt   Int           @default(10)
+  weight       Float?
+  isFeatured   Boolean       @default(false)
+  status       ProductStatus @default(draft)
+  totalSold    Int           @default(0)
+  tags         String[]
+  seoTitle     String?
+  seoDesc      String?
+  seoKeywords  String[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  category      Category       @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  images        ProductImage[]
+  reviews       Review[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+  inventoryLogs InventoryLog[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([stock])
+}
+
+model ProductVariant {
+  id         String   @id @default(uuid())
+  productId  String
+  label      String
+  sku        String   @unique
+  price      Float
+  mrp        Float
+  stock      Int      @default(0)
+  weight     Float?
+  imageUrl   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id         String   @id @default(uuid())
+  productId  String
+  url        String
+  altText    String?
+  sortOrder  Int      @default(0)
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// ─── INVENTORY LOG ────────────────────────────────────────────────────────────
+
+model InventoryLog {
+  id          String             @id @default(uuid())
+  productId   String
+  operation   InventoryOperation
+  quantity    Int
+  stockAfter  Int
+  note        String?
+  adminId     String?
+  orderId     String?
+  createdAt   DateTime           @default(now())
+
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+}
+
+// ─── ORDER ────────────────────────────────────────────────────────────────────
+
+model Order {
+  id                 String        @id @default(uuid())
+  orderId            String        @unique  // ORD-2026-XXXXX
+  userId             String
+  addressId          String
+  status             OrderStatus   @default(pending)
+  paymentMethod      PaymentMethod
+  paymentStatus      PaymentStatus @default(pending)
+  subtotal           Float
+  gst                Float         @default(0)
+  shipping           Float         @default(0)
+  discount           Float         @default(0)
+  total              Float
+  couponId           String?
+  notes              String?
+  deliveryDate       DateTime?
+  deliverySlot       String?
+  courierName        String?
+  trackingNo         String?
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  razorpaySignature  String?
+  refundId           String?
+  refundAmount       Float?
+  refundedAt         DateTime?
+  paidAt             DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id])
+  address       Address        @relation(fields: [addressId], references: [id])
+  coupon        Coupon?        @relation(fields: [couponId], references: [id])
+  items         OrderItem[]
+  timeline      OrderTimeline[]
+  paymentLogs   PaymentLog[]
+  returnRequests ReturnRequest[]
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  productId  String
+  variantId  String?
+  qty        Int
+  price      Float
+  total      Float
+  createdAt  DateTime @default(now())
+
+  order      Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product        @relation(fields: [productId], references: [id])
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderTimeline {
+  id        String   @id @default(uuid())
+  orderId   String
+  status    String
+  note      String?
+  adminId   String?
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ─── PAYMENT LOG ──────────────────────────────────────────────────────────────
+
+model PaymentLog {
+  id                 String   @id @default(uuid())
+  orderId            String
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  amount             Float
+  currency           String   @default("INR")
+  status             String
+  method             String
+  gateway            String   @default("razorpay")
+  errorCode          String?
+  errorDescription   String?
+  createdAt          DateTime @default(now())
+
+  order              Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([razorpayPaymentId])
+}
+
+// ─── COUPON ───────────────────────────────────────────────────────────────────
+
+model Coupon {
+  id            String     @id @default(uuid())
+  code          String     @unique
+  type          CouponType
+  value         Float
+  maxDiscount   Float?
+  minOrderValue Float      @default(0)
+  usageLimit    Int?
+  usedCount     Int        @default(0)
+  isActive      Boolean    @default(true)
+  expiresAt     DateTime?
+  description   String?
+  createdAt     DateTime   @default(now())
+
+  orders        Order[]
+
+  @@index([code])
+}
+
+// ─── REVIEW ───────────────────────────────────────────────────────────────────
+
+model Review {
+  id          String   @id @default(uuid())
+  userId      String
+  productId   String
+  rating      Int
+  title       String?
+  body        String?  @db.Text
+  imageUrls   String[]
+  isApproved  Boolean  @default(false)
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([isApproved])
+}
+
+// ─── WISHLIST ─────────────────────────────────────────────────────────────────
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  userId     String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// ─── LOYALTY ──────────────────────────────────────────────────────────────────
+
+model LoyaltyLog {
+  id          String   @id @default(uuid())
+  userId      String
+  points      Int
+  type        String   // earned | redeemed | expired | bonus
+  description String
+  orderId     String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// ─── PANDIT ───────────────────────────────────────────────────────────────────
+
+model PanditProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  bio             String?  @db.Text
+  experience      Int      @default(0)  // years
+  languages       String[]
+  specializations String[]
+  city            String
+  serviceRadius   Int      @default(25) // km
+  basePrice       Float    @default(0)
+  rating          Float    @default(0)
+  totalReviews    Int      @default(0)
+  totalBookings   Int      @default(0)
+  commissionPct   Float    @default(10)
+  isVerified      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  bankName        String?
+  bankAccount     String?
+  bankIfsc        String?
+  upiId           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id])
+  services        PanditService[]
+  bookings        PanditBooking[]
+  availability    PanditAvailability[]
+  blockedDates    PanditBlockedDate[]
+
+  @@index([city])
+  @@index([isActive])
+}
+
+model PanditService {
+  id          String        @id @default(uuid())
+  panditId    String
+  name        String
+  description String?
+  duration    String
+  price       Float
+  samagri     SamagriOption @default(platform)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+
+  pandit      PanditProfile  @relation(fields: [panditId], references: [id])
+  bookings    PanditBooking[]
+
+  @@index([panditId])
+}
+
+model PanditBooking {
+  id            String        @id @default(uuid())
+  bookingId     String        @unique
+  userId        String
+  panditId      String
+  serviceId     String
+  status        BookingStatus @default(pending)
+  ceremonyDate  DateTime
+  ceremonyTime  String
+  address       String
+  participants  Int?
+  language      String        @default("Hindi")
+  samagriKit    Boolean       @default(false)
+  panditCharges Float
+  samagriAmount Float         @default(0)
+  total         Float
+  paymentStatus PaymentStatus @default(pending)
+  notes         String?
+  rejectReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  pandit        PanditProfile  @relation(fields: [panditId], references: [id])
+  service       PanditService  @relation(fields: [serviceId], references: [id])
+
+  @@index([userId])
+  @@index([panditId])
+  @@index([status])
+  @@index([ceremonyDate])
+}
+
+model PanditAvailability {
+  id         String   @id @default(uuid())
+  panditId   String
+  dayOfWeek  Int      // 0=Sun … 6=Sat
+  startTime  String   // "08:00"
+  endTime    String   // "20:00"
+
+  pandit     PanditProfile @relation(fields: [panditId], references: [id], onDelete: Cascade)
+
+  @@unique([panditId, dayOfWeek])
+}
+
+model PanditBlockedDate {
+  id        String   @id @default(uuid())
+  panditId  String
+  date      DateTime @db.Date
+  reason    String?
+
+  pandit    PanditProfile @relation(fields: [panditId], references: [id], onDelete: Cascade)
+
+  @@unique([panditId, date])
+  @@index([panditId])
+}
+
+// ─── RETURN REQUEST ───────────────────────────────────────────────────────────
+
+model ReturnRequest {
+  id          String   @id @default(uuid())
+  orderId     String
+  reason      String
+  description String?
+  imageUrls   String[]
+  status      String   @default("requested") // requested|approved|rejected|pickup_scheduled|received|refunded
+  adminNote   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order       Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ─── SUPPORT TICKET ───────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String
+  subject     String
+  description String   @db.Text
+  status      String   @default("open") // open|in_progress|resolved|closed
+  priority    String   @default("medium")
+  orderId     String?
+  assignedTo  String?
+  resolution  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}

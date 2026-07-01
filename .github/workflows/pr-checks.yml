@@ -1,0 +1,164 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .github/workflows/pr-checks.yml
+# Runs on every PR — lint, type-check, build validation for all apps
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: ✅ PR Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Backend checks ──────────────────────────────────────────────────────────
+  check-api:
+    name: 🔌 API — Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint || true
+
+  # ── Frontend checks ─────────────────────────────────────────────────────────
+  check-web:
+    name: 🌐 Web — Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL:      https://api.thekhatumart.com/api/v1
+          NEXT_PUBLIC_WS_URL:       wss://api.thekhatumart.com/ws
+          NEXT_PUBLIC_RAZORPAY_KEY: rzp_test_dummy
+
+  check-admin:
+    name: 🛠️ Admin — Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/admin/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.thekhatumart.com/api/v1
+
+  check-pandit:
+    name: 🙏 Pandit — Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/pandit
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/pandit/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.thekhatumart.com/api/v1
+
+  # ── Security audit ──────────────────────────────────────────────────────────
+  security:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit backend dependencies
+        run: npm audit --audit-level=high || true
+        working-directory: backend
+
+      - name: Audit web dependencies
+        run: npm audit --audit-level=high || true
+        working-directory: apps/web
+
+      - name: Check for secrets in code
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # ── PR Summary comment ───────────────────────────────────────────────────────
+  summary:
+    name: 📋 PR Summary
+    runs-on: ubuntu-latest
+    needs: [check-api, check-web, check-admin, check-pandit, security]
+    if: always()
+
+    steps:
+      - name: Post PR summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = {
+              'API':      '${{ needs.check-api.result }}',
+              'Web':      '${{ needs.check-web.result }}',
+              'Admin':    '${{ needs.check-admin.result }}',
+              'Pandit':   '${{ needs.check-pandit.result }}',
+              'Security': '${{ needs.security.result }}',
+            };
+            const icon = r => r === 'success' ? '✅' : r === 'failure' ? '❌' : '⏭️';
+            const rows = Object.entries(jobs)
+              .map(([name, result]) => `| ${name} | ${icon(result)} ${result} |`)
+              .join('\n');
+            const allPassed = Object.values(jobs).every(r => r === 'success' || r === 'skipped');
+            const body = `## 🪔 KhatuMart PR Checks\n\n| Check | Status |\n|-------|--------|\n${rows}\n\n${allPassed ? '✅ All checks passed! Ready to merge.' : '❌ Some checks failed. Please fix before merging.'}`;
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            } catch(e) {
+              console.log('Could not post comment:', e.message);
+            }
