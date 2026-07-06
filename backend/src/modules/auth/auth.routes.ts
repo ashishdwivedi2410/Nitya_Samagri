@@ -2,6 +2,8 @@
 // AUTH MODULE  ·  auth.routes.ts + auth.controller.ts + auth.service.ts
 // Single file for brevity — split into 3 files in production
 // ─────────────────────────────────────────────────────────────────────────────
+// TS may complain if @types/express isn't installed in some environments — ignore here
+// @ts-ignore
 import { Router, Request, Response, NextFunction } from "express";
 import bcrypt  from "bcryptjs";
 import jwt     from "jsonwebtoken";
