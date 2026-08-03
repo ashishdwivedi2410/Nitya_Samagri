@@ -1,4 +1,4 @@
-# 🪔 nityasamagri — Spiritual Commerce Platform
+# 🪔 Nitya Samagri — Spiritual Commerce Platform
  
 > **Bringing Divinity to Your Doorstep**
 > India's most complete platform for pure puja samagri, verified pandits, and complete puja packages.
