@@ -22,7 +22,9 @@ const CreateOrderSchema = z.object({
     productId: z.string().uuid(),
     variantId: z.string().uuid().optional(),
     qty:       z.number().int().min(1),
-    price:     z.number().positive(),
+    // NOTE: intentionally no `price` field — price is always looked up
+    // server-side from the Product/ProductVariant record, never trusted
+    // from the client. See order creation handler below.
   })).min(1),
   addressId:       z.string().uuid(),
   deliveryDate:    z.string().datetime().optional(),
@@ -87,22 +89,34 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
   const address = await prisma.address.findFirst({ where: { id: data.addressId, userId } });
   if (!address) throw new AppError("Address not found", 404);
 
-  // 2. Validate stock & lock products
+  // 2. Validate stock & resolve authoritative pricing from the DB
   const productIds = data.items.map(i => i.productId);
-  const products   = await prisma.product.findMany({ where: { id: { in: productIds } } });
+  const products    = await prisma.product.findMany({
+    where:   { id: { in: productIds } },
+    include: { variants: true },
+  });
 
-  for (const item of data.items) {
+  // Resolve each line item against the DB — price and stock are NEVER taken
+  // from the client, only productId/variantId/qty are trusted as references.
+  const resolvedItems = data.items.map(item => {
     const product = products.find(p => p.id === item.productId);
-    if (!product)           throw new AppError(`Product ${item.productId} not found`, 404);
-    if (product.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name}`, 400);
-  }
+    if (!product) throw new AppError(`Product ${item.productId} not found`, 404);
+    if (product.status !== "active") throw new AppError(`${product.name} is not available for purchase`, 400);
 
-  // 3. Calculate totals
-  const subtotal  = data.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const gst       = data.items.reduce((s, i) => {
-    const prod = products.find(p => p.id === i.productId)!;
-    return s + (i.price * i.qty * (prod.gstPct || 5) / 100);
-  }, 0);
+    if (item.variantId) {
+      const variant = product.variants.find(v => v.id === item.variantId && v.isActive);
+      if (!variant) throw new AppError(`Variant not found for ${product.name}`, 404);
+      if (variant.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name} (${variant.label})`, 400);
+      return { ...item, product, price: variant.price, gstPct: product.gstPct || 5 };
+    }
+
+    if (product.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name}`, 400);
+    return { ...item, product, price: product.price, gstPct: product.gstPct || 5 };
+  });
+
+  // 3. Calculate totals using server-resolved prices only
+  const subtotal  = resolvedItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const gst       = resolvedItems.reduce((s, i) => s + (i.price * i.qty * i.gstPct / 100), 0);
   const shipping  = subtotal >= 499 ? 0 : 49;
 
   let discount  = 0;
@@ -117,12 +131,30 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
 
   // 4. Create order in transaction
   const order = await prisma.$transaction(async (tx) => {
-    // Decrement stock
-    for (const item of data.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data:  { stock: { decrement: item.qty } },
-      });
+    // Decrement stock (product or variant, matching what was validated above).
+    // Use updateMany with a `stock >= qty` guard instead of a plain update —
+    // this makes the decrement atomic and conditional at the DB level, so two
+    // concurrent checkouts racing for the last unit can't both succeed and
+    // drive stock negative. If the guard fails (someone else beat us to it),
+    // count is 0 and we abort the whole transaction.
+    for (const item of resolvedItems) {
+      if (item.variantId) {
+        const result = await tx.productVariant.updateMany({
+          where: { id: item.variantId, stock: { gte: item.qty } },
+          data:  { stock: { decrement: item.qty } },
+        });
+        if (result.count === 0) {
+          throw new AppError(`Insufficient stock for ${item.product.name} (variant) — please review your cart`, 409);
+        }
+      } else {
+        const result = await tx.product.updateMany({
+          where: { id: item.productId, stock: { gte: item.qty } },
+          data:  { stock: { decrement: item.qty } },
+        });
+        if (result.count === 0) {
+          throw new AppError(`Insufficient stock for ${item.product.name} — please review your cart`, 409);
+        }
+      }
     }
 
     // Increment coupon usage
@@ -148,11 +180,11 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
         deliveryDate:  data.deliveryDate ? new Date(data.deliveryDate) : null,
         deliverySlot:  data.deliverySlot,
         notes:         data.notes,
-        items:         { create: data.items.map(i => ({
+        items:         { create: resolvedItems.map(i => ({
           productId: i.productId,
           variantId: i.variantId,
           qty:       i.qty,
-          price:     i.price,
+          price:     i.price,       // server-resolved price, not client input
           total:     i.price * i.qty,
         }))},
       },

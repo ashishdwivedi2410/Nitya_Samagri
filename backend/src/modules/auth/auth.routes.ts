@@ -44,6 +44,15 @@ const RefreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+const OTP_TTL_SECONDS         = 600;      // OTP validity — 10 min, matches otp:${phone} TTL below
+const MAX_OTP_VERIFY_ATTEMPTS = 5;        // failed verify attempts allowed before lockout
+const OTP_LOCKOUT_SECONDS     = 30 * 60;  // 30 min lockout after too many failed attempts
+
+const MAX_LOGIN_ATTEMPTS       = 5;       // failed password attempts allowed before lockout
+const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60; // rolling window failed attempts are counted over
+const LOGIN_LOCKOUT_SECONDS    = 15 * 60; // lockout duration once threshold is hit
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -92,7 +101,7 @@ router.post("/register", validate(RegisterSchema), asyncHandler(async (req: Requ
 
   // Send OTP for phone verification
   const otp = generateOTP();
-  await redis.setex(`otp:${phone}`, 600, otp); // 10 min TTL
+  await redis.setex(`otp:${phone}`, OTP_TTL_SECONDS, otp); // 10 min TTL
   await sendSMS(phone, `Your nityasamagri verification OTP is ${otp}. Valid for 10 minutes.`);
 
   res.status(201).json({
@@ -109,12 +118,44 @@ router.post("/register", validate(RegisterSchema), asyncHandler(async (req: Requ
 router.post("/login", validate(LoginSchema), asyncHandler(async (req: Request, res: Response) => {
   const { phone, password } = req.body;
 
+  // Lockout check: too many recent failed attempts for this phone number
+  const lockKey = `login_lock:${phone}`;
+  const locked  = await redis.get(lockKey);
+  if (locked) {
+    const ttl = await redis.ttl(lockKey);
+    throw new AppError(
+      `Too many failed login attempts. Please try again in ${Math.max(1, Math.ceil(ttl / 60))} minute(s).`,
+      429
+    );
+  }
+
+  const failKey = `login_fails:${phone}`;
+
+  async function registerFailure(): Promise<never> {
+    const fails = await redis.incr(failKey);
+    if (fails === 1) await redis.expire(failKey, LOGIN_ATTEMPT_WINDOW_SECONDS);
+
+    if (fails >= MAX_LOGIN_ATTEMPTS) {
+      await redis.setex(lockKey, LOGIN_LOCKOUT_SECONDS, "1");
+      await redis.del(failKey);
+      throw new AppError(
+        `Too many failed login attempts. Please try again in ${Math.ceil(LOGIN_LOCKOUT_SECONDS / 60)} minute(s).`,
+        429
+      );
+    }
+    throw new AppError("Invalid credentials", 401);
+  }
+
   const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) throw new AppError("Invalid credentials", 401);
+  if (!user) return registerFailure();
   if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
 
   const isMatch = await bcrypt.compare(password, user.password!);
-  if (!isMatch) throw new AppError("Invalid credentials", 401);
+  if (!isMatch) return registerFailure();
+
+  // Success — clear any failed-attempt tracking for this phone
+  await redis.del(failKey);
+  await redis.del(lockKey);
 
   const { accessToken, refreshToken } = signTokens(user.id, user.role);
 
@@ -147,7 +188,7 @@ router.post("/otp/request", validate(OtpRequestSchema), asyncHandler(async (req:
   if (attempts > 3)   throw new AppError("Too many OTP requests. Try again in 10 minutes.", 429);
 
   const otp = generateOTP();
-  await redis.setex(`otp:${phone}`, 600, otp);
+  await redis.setex(`otp:${phone}`, OTP_TTL_SECONDS, otp);
   await sendSMS(phone, `Your nityasamagri OTP is ${otp}. Do not share it with anyone.`);
 
   // Dev only: return OTP in response
@@ -164,12 +205,44 @@ router.post("/otp/request", validate(OtpRequestSchema), asyncHandler(async (req:
 router.post("/otp/verify", validate(OtpVerifySchema), asyncHandler(async (req: Request, res: Response) => {
   const { phone, otp } = req.body;
 
-  const storedOtp = await redis.get(`otp:${phone}`);
-  if (!storedOtp || storedOtp !== otp) throw new AppError("Invalid or expired OTP", 400);
+  // Lockout check: if this phone has failed too many verify attempts recently, block it
+  const lockKey = `otp_lock:${phone}`;
+  const locked  = await redis.get(lockKey);
+  if (locked) {
+    const ttl = await redis.ttl(lockKey);
+    throw new AppError(
+      `Too many failed attempts. Please try again in ${Math.max(1, Math.ceil(ttl / 60))} minute(s).`,
+      429
+    );
+  }
 
-  // Delete OTP from Redis (one-time use)
+  const storedOtp = await redis.get(`otp:${phone}`);
+
+  if (!storedOtp || storedOtp !== otp) {
+    // Track failed verify attempts per phone (max 5, then lock out)
+    const failKey = `otp_verify_fails:${phone}`;
+    const fails   = await redis.incr(failKey);
+    if (fails === 1) await redis.expire(failKey, OTP_TTL_SECONDS);
+
+    if (fails >= MAX_OTP_VERIFY_ATTEMPTS) {
+      // Lock the phone out and burn the current OTP so it can't keep being guessed
+      await redis.setex(lockKey, OTP_LOCKOUT_SECONDS, "1");
+      await redis.del(`otp:${phone}`);
+      await redis.del(failKey);
+      throw new AppError(
+        "Too many failed attempts. This OTP has been invalidated — please request a new one after the lockout period.",
+        429
+      );
+    }
+
+    throw new AppError("Invalid or expired OTP", 400);
+  }
+
+  // Success — clear OTP and all attempt/lockout tracking (one-time use)
   await redis.del(`otp:${phone}`);
   await redis.del(`otp_attempts:${phone}`);
+  await redis.del(`otp_verify_fails:${phone}`);
+  await redis.del(lockKey);
 
   let user = await prisma.user.findUnique({ where: { phone } });
 
@@ -205,7 +278,7 @@ router.post("/refresh", validate(RefreshSchema), asyncHandler(async (req: Reques
 
   let decoded: { userId: string; role: string };
   try {
-    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as typeof decoded;
+    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!, { algorithms: ["HS256"] }) as typeof decoded;
   } catch {
     throw new AppError("Invalid or expired refresh token", 401);
   }

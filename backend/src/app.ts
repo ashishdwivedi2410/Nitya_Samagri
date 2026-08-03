@@ -34,7 +34,7 @@ app.use(compression());
 app.use(morgan("combined", { stream: { write: msg => logger.info(msg.trim()) } }));
 
 // Raw body for Razorpay webhook signature verification
-app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+app.use("/api/v1/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

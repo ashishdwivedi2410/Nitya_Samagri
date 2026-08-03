@@ -5,9 +5,10 @@ import { logger } from "../utils/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AuthenticatedSocket extends WebSocket {
-  userId?:   string;
-  userRole?: string;
-  isAlive:   boolean;
+  userId?:        string;
+  userRole?:      string;
+  isAlive:        boolean;
+  isAuthenticated: boolean;
 }
 
 export type WsEventType =
@@ -33,75 +34,67 @@ const userConnections = new Map<string, Set<AuthenticatedSocket>>();
 // Admin connections pool
 const adminConnections = new Set<AuthenticatedSocket>();
 
+// How long an unauthenticated connection is allowed to stay open before it
+// must send an { type: "auth", token } message, or it's dropped.
+const AUTH_TIMEOUT_MS = 10_000;
+
 let wss: WebSocketServer;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 export function initWebSocket(server: http.Server) {
   wss = new WebSocketServer({ server, path: "/ws" });
 
-  wss.on("connection", (socket: AuthenticatedSocket, req) => {
-    socket.isAlive = true;
+  wss.on("connection", (socket: AuthenticatedSocket) => {
+    socket.isAlive         = true;
+    socket.isAuthenticated = false;
 
-    // Extract JWT from ?token= query param
-    const url    = new URL(req.url!, `http://${req.headers.host}`);
-    const token  = url.searchParams.get("token");
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-          userId: string; role: string;
-        };
-        socket.userId   = decoded.userId;
-        socket.userRole = decoded.role;
-
-        // Register connection
-        if (decoded.role === "admin" || decoded.role === "super_admin") {
-          adminConnections.add(socket);
-        } else {
-          if (!userConnections.has(decoded.userId)) {
-            userConnections.set(decoded.userId, new Set());
-          }
-          userConnections.get(decoded.userId)!.add(socket);
-        }
-
-        logger.info(`WS connected: userId=${decoded.userId} role=${decoded.role}`);
-      } catch {
-        socket.close(1008, "Invalid token");
-        return;
+    // The client must authenticate via its first message rather than a
+    // ?token= query param — query strings routinely end up in server access
+    // logs, reverse-proxy logs, and browser history, which would leak the
+    // JWT. See handleAuthMessage below.
+    const authTimer = setTimeout(() => {
+      if (!socket.isAuthenticated) {
+        socket.close(1008, "Authentication timeout");
       }
-    } else {
-      socket.close(1008, "Token required");
-      return;
-    }
+    }, AUTH_TIMEOUT_MS);
 
     // Ping/pong heartbeat
     socket.on("pong", () => { socket.isAlive = true; });
 
     // Handle client messages
     socket.on("message", (data) => {
+      let msg: unknown;
       try {
-        const msg = JSON.parse(data.toString());
-        handleClientMessage(socket, msg);
+        msg = JSON.parse(data.toString());
       } catch {
         socket.send(JSON.stringify({ event: "ERROR", payload: { message: "Invalid message format" } }));
+        return;
       }
+
+      if (!socket.isAuthenticated) {
+        handleAuthMessage(socket, msg, authTimer);
+        return;
+      }
+
+      handleClientMessage(socket, msg);
     });
 
     // Cleanup on disconnect
     socket.on("close", () => {
+      clearTimeout(authTimer);
       if (socket.userId) {
         const conns = userConnections.get(socket.userId);
         conns?.delete(socket);
         if (conns?.size === 0) userConnections.delete(socket.userId);
       }
       adminConnections.delete(socket);
-      logger.info(`WS disconnected: userId=${socket.userId}`);
+      logger.info(`WS disconnected: userId=${socket.userId ?? "(unauthenticated)"}`);
     });
 
-    // Send welcome
+    // Prompt the client to authenticate
     socket.send(JSON.stringify({
-      event:   "CONNECTED",
-      payload: { message: "Connected to nityasamagri real-time server", timestamp: Date.now() },
+      event:   "AUTH_REQUIRED",
+      payload: { message: "Send { type: \"auth\", token }  within 10s to authenticate.", timestamp: Date.now() },
     }));
   });
 
@@ -117,6 +110,45 @@ export function initWebSocket(server: http.Server) {
 
   wss.on("close", () => clearInterval(heartbeat));
   logger.info("WebSocket server initialised");
+}
+
+// ── Auth handshake (first message only) ───────────────────────────────────────
+function handleAuthMessage(socket: AuthenticatedSocket, msg: unknown, authTimer: NodeJS.Timeout) {
+  const auth = msg as { type?: string; token?: string };
+  if (auth?.type !== "auth" || !auth.token) {
+    socket.close(1008, "Authentication required");
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!, { algorithms: ["HS256"] }) as {
+      userId: string; role: string;
+    };
+
+    clearTimeout(authTimer);
+    socket.isAuthenticated = true;
+    socket.userId          = decoded.userId;
+    socket.userRole        = decoded.role;
+
+    // Register connection
+    if (decoded.role === "admin" || decoded.role === "super_admin") {
+      adminConnections.add(socket);
+    } else {
+      if (!userConnections.has(decoded.userId)) {
+        userConnections.set(decoded.userId, new Set());
+      }
+      userConnections.get(decoded.userId)!.add(socket);
+    }
+
+    logger.info(`WS connected: userId=${decoded.userId} role=${decoded.role}`);
+
+    socket.send(JSON.stringify({
+      event:   "CONNECTED",
+      payload: { message: "Connected to nityasamagri real-time server", timestamp: Date.now() },
+    }));
+  } catch {
+    socket.close(1008, "Invalid token");
+  }
 }
 
 // ── Client message handler ────────────────────────────────────────────────────
