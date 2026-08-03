@@ -1,5 +1,5 @@
 // apps/web/app/layout.tsx
-// Customer Storefront — TheKhatuMart
+// Customer Storefront — nityasamagri
 
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
@@ -19,10 +19,10 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://thekhatumart.com"),
+  metadataBase: new URL("https://nityasamagri.com"),
   title: {
-    default:  "TheKhatuMart — Pure Puja Samagri & Verified Pandits",
-    template: "%s | TheKhatuMart",
+    default:  "nityasamagri — Pure Puja Samagri & Verified Pandits",
+    template: "%s | nityasamagri",
   },
   description:
     "India's most trusted spiritual commerce platform. Order temple-grade puja samagri, book verified pandits, and get complete puja packages delivered anywhere in India.",
@@ -33,13 +33,13 @@ export const metadata: Metadata = {
     "cow ghee for puja",
     "navratri puja kit",
     "griha pravesh pandit",
-    "khatumart",
+    "nityasamagri",
     "online puja store india",
     "buy puja items online",
   ],
-  authors:   [{ name: "TheKhatuMart", url: "https://thekhatumart.com" }],
-  creator:   "TheKhatuMart",
-  publisher: "TheKhatuMart",
+  authors:   [{ name: "nityasamagri", url: "https://nityasamagri.com" }],
+  creator:   "nityasamagri",
+  publisher: "nityasamagri",
   robots: {
     index:     true,
     follow:    true,
@@ -48,25 +48,25 @@ export const metadata: Metadata = {
   openGraph: {
     type:        "website",
     locale:      "en_IN",
-    url:         "https://thekhatumart.com",
-    siteName:    "TheKhatuMart",
-    title:       "TheKhatuMart — Pure Puja Samagri & Verified Pandits",
+    url:         "https://nityasamagri.com",
+    siteName:    "nityasamagri",
+    title:       "nityasamagri — Pure Puja Samagri & Verified Pandits",
     description: "Order pure puja samagri and book verified pandits online. Delivered anywhere in India.",
     images: [
       {
         url:    "/og-image.jpg",
         width:  1200,
         height: 630,
-        alt:    "TheKhatuMart — Simplifying Your Spiritual Journey",
+        alt:    "nityasamagri — Simplifying Your Spiritual Journey",
       },
     ],
   },
   twitter: {
     card:        "summary_large_image",
-    title:       "TheKhatuMart — Pure Puja Samagri & Verified Pandits",
+    title:       "nityasamagri — Pure Puja Samagri & Verified Pandits",
     description: "India's spiritual commerce platform.",
     images:      ["/og-image.jpg"],
-    creator:     "@khatumart",
+    creator:     "@nityasamagri",
   },
   icons: {
     icon:        [{ url: "/favicon.ico" }, { url: "/favicon-32x32.png", sizes: "32x32" }],

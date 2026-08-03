@@ -93,7 +93,7 @@ router.post("/register", validate(RegisterSchema), asyncHandler(async (req: Requ
   // Send OTP for phone verification
   const otp = generateOTP();
   await redis.setex(`otp:${phone}`, 600, otp); // 10 min TTL
-  await sendSMS(phone, `Your KhatuMart verification OTP is ${otp}. Valid for 10 minutes.`);
+  await sendSMS(phone, `Your nityasamagri verification OTP is ${otp}. Valid for 10 minutes.`);
 
   res.status(201).json({
     success: true,
@@ -148,7 +148,7 @@ router.post("/otp/request", validate(OtpRequestSchema), asyncHandler(async (req:
 
   const otp = generateOTP();
   await redis.setex(`otp:${phone}`, 600, otp);
-  await sendSMS(phone, `Your KhatuMart OTP is ${otp}. Do not share it with anyone.`);
+  await sendSMS(phone, `Your nityasamagri OTP is ${otp}. Do not share it with anyone.`);
 
   // Dev only: return OTP in response
   const data: Record<string, unknown> = { message: "OTP sent successfully" };

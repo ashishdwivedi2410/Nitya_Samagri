@@ -169,7 +169,7 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
   // 6. Send confirmation SMS (non-blocking)
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true } });
   if (user?.phone) {
-    sendSMS(user.phone, `Hi ${user.name}! Your KhatuMart order ${order.orderId} for ₹${order.total} has been placed. Track it at khatumart.com/orders`).catch(() => {});
+    sendSMS(user.phone, `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.com/orders`).catch(() => {});
   }
 
   res.status(201).json({ success: true, data: { order } });
@@ -342,7 +342,7 @@ router.patch("/:orderId/status",
       confirmed:        `Hi ${user?.name}! Your order ${order.orderId} has been confirmed. `,
       shipped:          `Hi ${user?.name}! Your order ${order.orderId} has been shipped via ${courierName}. Track: ${trackingNo}`,
       out_for_delivery: `Hi ${user?.name}! Your order ${order.orderId} is out for delivery. Expect it today!`,
-      delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. Thank you for shopping at KhatuMart! 🙏`,
+      delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. Thank you for shopping at nityasamagri! 🙏`,
     };
     if (user?.phone && smsTemplates[status]) {
       sendSMS(user.phone, smsTemplates[status]).catch(() => {});

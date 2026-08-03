@@ -25,7 +25,7 @@ const razorpay = new Razorpay({
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const CreatePaymentOrderSchema = z.object({
-  orderId: z.string().min(1),  // KhatuMart order ID e.g. ORD-2026-1999
+  orderId: z.string().min(1),  // nityasamagri order ID e.g. ORD-2026-1999
 });
 
 const VerifyPaymentSchema = z.object({
@@ -46,7 +46,7 @@ const RefundSchema = z.object({
 
 /**
  * POST /api/v1/payments/create-order
- * Create Razorpay order for a KhatuMart order
+ * Create Razorpay order for a nityasamagri order
  * Called from checkout frontend before Razorpay SDK opens
  */
 router.post("/create-order",
@@ -67,7 +67,7 @@ router.post("/create-order",
       currency: "INR",
       receipt:  order.orderId,
       notes:    {
-        khatumart_order_id: order.orderId,
+        nityasamagri_order_id: order.orderId,
         customer_id:        order.userId,
       },
     });

@@ -1,7 +1,7 @@
-# 🪔 TheKhatuMart — Complete API Documentation
+# 🪔 nityasamagri — Complete API Documentation
 
-> **Base URL:** `https://api.thekhatumart.com/api/v1`
-> **WebSocket:** `wss://api.thekhatumart.com/ws`
+> **Base URL:** `https://api.nityasamagri.com/api/v1`
+> **WebSocket:** `wss://api.nityasamagri.com/ws`
 > **Version:** 1.0.0 · **Last Updated:** June 2026
 
 ---
@@ -1167,7 +1167,7 @@ Authorization: Bearer <admin_token>
 ### Connect
 ```javascript
 const token = "your_access_token";
-const ws = new WebSocket(`wss://api.thekhatumart.com/ws?token=${token}`);
+const ws = new WebSocket(`wss://api.thenityasamagri.com/ws?token=${token}`);
 ```
 
 ### Events sent to customer
@@ -1318,4 +1318,4 @@ All list endpoints return pagination metadata:
 
 ---
 
-*© 2026 TheKhatuMart · Mohali, Punjab · support@thekhatumart.com*
+*© 2026 Thenityasamagri · Mohali, Punjab · support@thenityasamagri.com*

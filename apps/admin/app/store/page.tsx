@@ -84,9 +84,9 @@ const ANNOUNCEMENTS = [
 ];
 
 const SEO_PAGES = [
-  { id:"sp1", page:"Homepage",           title:"TheKhatuMart — Pure Puja Samagri & Book Pandits Online",           desc:"Order temple-grade puja items & book verified pandits.", score:92 },
-  { id:"sp2", page:"Puja Samagri",       title:"Buy Pure Puja Samagri Online | KhatuMart",                         desc:"Shop authentic puja items delivered to your door.",       score:87 },
-  { id:"sp3", page:"Book Pandit",        title:"Book Verified Pandits Online | KhatuMart",                         desc:"Find experienced pandits for all ceremonies.",            score:78 },
+  { id:"sp1", page:"Homepage",           title:"nityasamagri — Pure Puja Samagri & Book Pandits Online",           desc:"Order temple-grade puja items & book verified pandits.", score:92 },
+  { id:"sp2", page:"Puja Samagri",       title:"Buy Pure Puja Samagri Online | nityasamagri",                         desc:"Shop authentic puja items delivered to your door.",       score:87 },
+  { id:"sp3", page:"Book Pandit",        title:"Book Verified Pandits Online | nityasamagri",                         desc:"Find experienced pandits for all ceremonies.",            score:78 },
   { id:"sp4", page:"Cow Ghee",           title:"Buy Pure A2 Cow Ghee for Puja Online",                             desc:"Bilona method A2 ghee for havan, deepak & cooking.",     score:95 },
   { id:"sp5", page:"Hawan Samagri",      title:"Hawan Samagri Kit Online | Pure Ingredients",                      desc:"Complete havan kits with all required ingredients.",      score:81 },
 ];
@@ -456,7 +456,7 @@ function FestivalsView() {
             </div>
             <div style={{ background:S.bgCard, borderRadius:12, padding:"16px", border:`1px solid ${S.border}` }}>
               <div style={{ fontSize:13, fontWeight:700, color:S.text, marginBottom:12 }}>🔍 SEO Settings</div>
-              {[["Page Title",`${selected.name} | KhatuMart`],["Meta Desc","Shop festival products..."],["Slug",`/${selected.name.toLowerCase().replace(/ /g,"-")}`]].map(([k,v])=>(
+              {[["Page Title",`${selected.name} | nityasamagri`],["Meta Desc","Shop festival products..."],["Slug",`/${selected.name.toLowerCase().replace(/ /g,"-")}`]].map(([k,v])=>(
                 <div key={k} style={{ marginBottom:8 }}>
                   <div style={{ fontSize:10, color:S.textLight, fontWeight:700, marginBottom:2 }}>{k}</div>
                   <div style={{ fontSize:12, color:S.text }}>{v}</div>
@@ -513,7 +513,7 @@ function BlogView() {
           <div style={{ marginTop:14, padding:"14px 16px", background:S.bgHover, borderRadius:10, border:`1px solid ${S.border}` }}>
             <div style={{ fontSize:11, fontWeight:700, color:S.textLight, marginBottom:8, textTransform:"uppercase", letterSpacing:0.6 }}>SEO Preview</div>
             <div style={{ fontSize:16, color:S.blue, fontWeight:600, marginBottom:2 }}>{draftTitle || "Post title will appear here"}</div>
-            <div style={{ fontSize:12, color:S.green, marginBottom:4 }}>khatumart.com/blog/{(draftTitle||"post-title").toLowerCase().replace(/[^a-z0-9]+/g,"-")}</div>
+            <div style={{ fontSize:12, color:S.green, marginBottom:4 }}>nityasamagri.com/blog/{(draftTitle||"post-title").toLowerCase().replace(/[^a-z0-9]+/g,"-")}</div>
             <div style={{ fontSize:13, color:S.textMid }}>Meta description will be auto-generated from the first 160 characters of your content.</div>
           </div>
           <div style={{ display:"flex", gap:10, marginTop:14 }}>
@@ -768,7 +768,7 @@ export default function StoreManagement() {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontSize:20 }}>🪔</span>
             <div>
-              <div style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:14, color:S.sbAccent }}>KhatuMart</div>
+              <div style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:14, color:S.sbAccent }}>nityasamagri</div>
               <div style={{ fontSize:9, color:S.sbTextDim, letterSpacing:1.4, textTransform:"uppercase" }}>Store Manager</div>
             </div>
           </div>

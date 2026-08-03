@@ -272,7 +272,7 @@ export class RazorpayService {
             purpose:         "payout",
             queue_if_low_balance: true,
             reference_id:    params.referenceId,
-            narration:       params.narration || `KhatuMart ${params.purpose}`,
+            narration:       params.narration || `nityasamagri ${params.purpose}`,
           }),
         }
       ).then(r => r.json()) as { id: string };
@@ -309,9 +309,9 @@ export class RazorpayService {
       key:         process.env.RAZORPAY_KEY_ID,
       amount:      Math.round(params.amount * 100),
       currency:    "INR",
-      name:        "TheKhatuMart",
+      name:        "nityasamagri",
       description: `Order ${params.orderRef}`,
-      image:       "https://thekhatumart.com/logo.png",
+      image:       "https://nityasamagri.com/logo.png",
       order_id:    params.orderId,
       prefill: {
         name:    params.name,

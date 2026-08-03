@@ -154,7 +154,7 @@ function Navbar({ cartCount }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 26 }}>🪔</span>
           <div>
-            <div style={{ fontFamily: "'Georgia', serif", fontWeight: 700, fontSize: 18, color: COLORS.saffron, lineHeight: 1 }}>TheKhatuMart</div>
+            <div style={{ fontFamily: "'Georgia', serif", fontWeight: 700, fontSize: 18, color: COLORS.saffron, lineHeight: 1 }}>nityasamagri</div>
             <div style={{ fontSize: 10, color: COLORS.textLight, letterSpacing: 1.5, textTransform: "uppercase" }}>Simplifying Your Spiritual Journey</div>
           </div>
         </div>
@@ -407,12 +407,12 @@ export default function StoreFront() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <span style={{ fontSize: 22 }}>🪔</span>
-                <span style={{ fontFamily: "'Georgia', serif", fontSize: 18, fontWeight: 700, color: COLORS.marigoldLight }}>TheKhatuMart</span>
+                <span style={{ fontFamily: "'Georgia', serif", fontSize: 18, fontWeight: 700, color: COLORS.marigoldLight }}>nityasamagri</span>
               </div>
               <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 280, marginBottom: 16 }}>
                 India's most trusted platform for pure puja samagri and verified Pandits. Bringing divinity to your doorstep since 2024.
               </p>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>📍 Mohali, Punjab · support@thekhatumart.com</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>📍 Mohali, Punjab · support@nityasamagri.com</div>
             </div>
             {[
               { title: "Shop", links: ["Puja Samagri", "Ghee & Oils", "Hawan Items", "Idols & Books", "Festival Kits"] },
@@ -431,7 +431,7 @@ export default function StoreFront() {
             ))}
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>© 2026 TheKhatuMart. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>© 2026 nityasamagri. All rights reserved.</div>
             <div style={{ display: "flex", gap: 16 }}>
               {["UPI", "Razorpay", "COD", "Cards"].map(p => (
                 <span key={p} style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.08)", padding: "4px 10px", borderRadius: 6 }}>{p}</span>

@@ -47,7 +47,7 @@
 ## AWS_ACCESS_KEY_ID     XXXXXXXXXXXXXXXXXXXX
 ## AWS_SECRET_ACCESS_KEY XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ## AWS_REGION            ap-south-1
-## AWS_S3_BUCKET         khatumart-media
+## AWS_S3_BUCKET         nityasamagri-media
 
 ## ── CLOUDFLARE (optional, for CDN cache purge) ───────────────────────────────
 ## CF_ZONE_ID            Your Cloudflare Zone ID

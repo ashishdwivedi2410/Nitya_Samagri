@@ -661,7 +661,7 @@ export default function CartCheckout() {
         <div style={{ maxWidth: 1200, margin: "0 auto", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={reset}>
             <span style={{ fontSize: 20 }}>🪔</span>
-            <span style={{ fontFamily: "'Georgia',serif", fontWeight: 700, fontSize: 16, color: C.saffron }}>TheKhatuMart</span>
+            <span style={{ fontFamily: "'Georgia',serif", fontWeight: 700, fontSize: 16, color: C.saffron }}>nityasamagri</span>
           </div>
           <div style={{ fontSize: 13, color: C.textLight }}>
             🔒 Secured Checkout &nbsp;·&nbsp; Powered by Razorpay

@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
-echo "🪔 TheKhatuMart API — starting up..."
+echo "🪔 nityasamagri API — starting up..."
 
 # ── Wait for PostgreSQL to be ready ───────────────────────────────────────────
 echo "⏳ Waiting for PostgreSQL..."
@@ -32,5 +32,5 @@ echo "✅ Migrations complete"
 npx prisma generate > /dev/null 2>&1 || true
 
 # ── Start the application ─────────────────────────────────────────────────────
-echo "🚀 Starting KhatuMart API server..."
+echo "🚀 Starting nityasamagri API server..."
 exec "$@"

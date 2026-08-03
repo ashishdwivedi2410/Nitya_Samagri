@@ -1,7 +1,7 @@
-# 🚀 TheKhatuMart — AWS Lightsail Deployment Guide
+# 🚀 nityasamagri — AWS Lightsail Deployment Guide
 
 > **Server:** AWS Lightsail · **OS:** Ubuntu 22.04 LTS
-> **Domain:** thekhatumart.com
+> **Domain:** nityasamagri.com
 > **Stack:** Docker + Nginx + SSL (Let's Encrypt)
 
 ---
@@ -10,11 +10,11 @@
 
 | Service | URL |
 |---------|-----|
-| Customer Storefront | https://thekhatumart.com |
-| Admin Panel | https://admin.thekhatumart.com |
-| Pandit Panel | https://pandit.thekhatumart.com |
-| REST API | https://api.thekhatumart.com |
-| WebSocket | wss://api.thekhatumart.com/ws |
+| Customer Storefront | https://nityasamagri.com |
+| Admin Panel | https://admin.nityasamagri.com |
+| Pandit Panel | https://pandit.nityasamagri.com |
+| REST API | https://api.nityasamagri.com |
+| WebSocket | wss://api.nityasamagri.com/ws |
 
 ---
 
@@ -32,20 +32,20 @@ https://lightsail.aws.amazon.com
 - **Instance plan:** Choose **4 GB RAM / 2 vCPUs / 80 GB SSD** (minimum recommended)
   - $20/month plan works for production
   - You can upgrade later without data loss
-- **Instance name:** `khatumart-prod`
+- **Instance name:** `nityasamagri-prod`
 - Click **"Create instance"**
 
 ### 1.3 Create Static IP
 ```
 Lightsail → Networking → Create static IP
-→ Attach to: khatumart-prod
-→ Name: khatumart-static-ip
+→ Attach to: nityasamagri-prod
+→ Name: nityasamagri-static-ip
 ```
 > ⚠️ Static IP is FREE when attached to an instance. Required so your IP doesn't change.
 
 ### 1.4 Open Firewall Ports
 ```
-Lightsail → khatumart-prod → Networking → Firewall
+Lightsail → nityasamagri-prod → Networking → Firewall
 → Add rule: TCP port 80   (HTTP)
 → Add rule: TCP port 443  (HTTPS)
 → Add rule: TCP port 22   (SSH — already open)
@@ -54,7 +54,7 @@ Lightsail → khatumart-prod → Networking → Firewall
 ### 1.5 Download SSH Key
 ```
 Lightsail → Account → SSH keys → Download default key
-→ Save as: khatumart-key.pem
+→ Save as: nityasamagri-key.pem
 ```
 
 ---
@@ -63,9 +63,9 @@ Lightsail → Account → SSH keys → Download default key
 
 ```bash
 # On your local machine
-chmod 400 khatumart-key.pem
+chmod 400 nityasamagri-key.pem
 
-ssh -i khatumart-key.pem ubuntu@YOUR_STATIC_IP
+ssh -i nityasamagri-key.pem ubuntu@YOUR_STATIC_IP
 ```
 
 ---
@@ -86,7 +86,7 @@ Add these DNS records:
 
 > ⏳ DNS propagation takes 5–30 minutes. Check with:
 > ```bash
-> nslookup thekhatumart.com
+> nslookup nityasamagri.com
 > ```
 
 ---
@@ -139,7 +139,7 @@ sudo apt install -y git curl wget nano htop
 
 > ⚠️ DNS must be propagated before this step. Verify first:
 > ```bash
-> ping thekhatumart.com   # should show your Lightsail IP
+> ping nityasamagri.com   # should show your Lightsail IP
 > ```
 
 ```bash
@@ -147,12 +147,12 @@ sudo apt install -y git curl wget nano htop
 # Get SSL for all subdomains at once
 
 sudo certbot certonly --standalone \
-  -d thekhatumart.com \
-  -d www.thekhatumart.com \
-  -d admin.thekhatumart.com \
-  -d pandit.thekhatumart.com \
-  -d api.thekhatumart.com \
-  --email admin@thekhatumart.com \
+  -d nityasamagri.com \
+  -d www.nityasamagri.com \
+  -d admin.nityasamagri.com \
+  -d pandit.nityasamagri.com \
+  -d api.nityasamagri.com \
+  --email admin@nityasamagri.com \
   --agree-tos \
   --non-interactive
 ```
@@ -160,8 +160,8 @@ sudo certbot certonly --standalone \
 **Expected output:**
 ```
 Successfully received certificate.
-Certificate is saved at: /etc/letsencrypt/live/thekhatumart.com/fullchain.pem
-Key is saved at:         /etc/letsencrypt/live/thekhatumart.com/privkey.pem
+Certificate is saved at: /etc/letsencrypt/live/nityasamagri.com/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/nityasamagri.com/privkey.pem
 This certificate expires on 2026-09-01.
 ```
 
@@ -170,7 +170,7 @@ This certificate expires on 2026-09-01.
 sudo crontab -e
 
 # Add this line:
-0 12 * * * /usr/bin/certbot renew --quiet && docker compose -f /home/ubuntu/khatumart/docker-compose.yml -f /home/ubuntu/khatumart/docker-compose.prod.yml restart nginx
+0 12 * * * /usr/bin/certbot renew --quiet && docker compose -f /home/ubuntu/nityasamagri/docker-compose.yml -f /home/ubuntu/nityasamagri/docker-compose.prod.yml restart nginx
 ```
 
 ---
@@ -179,8 +179,8 @@ sudo crontab -e
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/khatumart.git
-cd khatumart
+git clone https://github.com/YOUR_USERNAME/nityasamagri.git
+cd nityasamagri
 ```
 
 ---
@@ -198,10 +198,10 @@ Fill in ALL values:
 # App
 NODE_ENV=production
 PORT=4000
-ALLOWED_ORIGINS=https://thekhatumart.com,https://admin.thekhatumart.com,https://pandit.thekhatumart.com
+ALLOWED_ORIGINS=https://nityasamagri.com,https://admin.nityasamagri.com,https://pandit.nityasamagri.com
 
 # Database
-DATABASE_URL=postgresql://postgres:YOUR_STRONG_PASSWORD@postgres:5432/khatumart
+DATABASE_URL=postgresql://postgres:YOUR_STRONG_PASSWORD@postgres:5432/nityasamagri
 
 # Redis
 REDIS_HOST=redis
@@ -226,13 +226,13 @@ TWILIO_PHONE=+91XXXXXXXXXX
 
 # SendGrid
 SENDGRID_API_KEY=SG.XXXXXXXXXXXXXXXXXXXXXXXX
-SENDGRID_FROM_EMAIL=noreply@thekhatumart.com
+SENDGRID_FROM_EMAIL=noreply@nityasamagri.com
 
 # AWS S3
 AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXX
 AWS_SECRET_ACCESS_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 AWS_REGION=ap-south-1
-AWS_S3_BUCKET=khatumart-media
+AWS_S3_BUCKET=nityasamagri-media
 
 # WhatsApp
 WHATSAPP_API_URL=https://graph.facebook.com/v18.0
@@ -270,13 +270,13 @@ docker compose logs -f
 
 **Expected services running:**
 ```
-khatumart_postgres  — Up (healthy)
-khatumart_redis     — Up (healthy)
-khatumart_api       — Up (healthy)
-khatumart_web       — Up
-khatumart_admin     — Up
-khatumart_pandit    — Up
-khatumart_nginx     — Up
+nityasamagri_postgres  — Up (healthy)
+nityasamagri_redis     — Up (healthy)
+nityasamagri_api       — Up (healthy)
+nityasamagri_web       — Up
+nityasamagri_admin     — Up
+nityasamagri_pandit    — Up
+nityasamagri_nginx     — Up
 ```
 
 ### Check all containers:
@@ -306,24 +306,24 @@ docker compose exec api npx prisma studio
 
 ### 10.1 Check API health
 ```bash
-curl https://api.thekhatumart.com/health
+curl https://api.nityasamagri.com/health
 # Expected: {"status":"ok","timestamp":"...","version":"1.0.0"}
 ```
 
 ### 10.2 Check all URLs
 ```bash
-curl -I https://thekhatumart.com
-curl -I https://admin.thekhatumart.com
-curl -I https://pandit.thekhatumart.com
-curl -I https://api.thekhatumart.com/health
+curl -I https://nityasamagri.com
+curl -I https://admin.nityasamagri.com
+curl -I https://pandit.nityasamagri.com
+curl -I https://api.nityasamagri.com/health
 ```
 
 All should return `HTTP/2 200`
 
 ### 10.3 Open in browser
-- https://thekhatumart.com → Customer storefront
-- https://admin.thekhatumart.com → Admin panel
-- https://pandit.thekhatumart.com → Pandit panel
+- https://nityasamagri.com → Customer storefront
+- https://admin.nityasamagri.com → Admin panel
+- https://pandit.nityasamagri.com → Pandit panel
 
 ---
 
@@ -332,7 +332,7 @@ All should return `HTTP/2 200`
 ```
 1. Login to Razorpay Dashboard
 2. Settings → Webhooks → Add New Webhook
-3. URL: https://api.thekhatumart.com/api/v1/payments/webhook
+3. URL: https://api.nityasamagri.com/api/v1/payments/webhook
 4. Secret: (same as RAZORPAY_WEBHOOK_SECRET in .env)
 5. Events to select:
    ✅ payment.captured
@@ -348,7 +348,7 @@ All should return `HTTP/2 200`
 ```
 1. Login to Shiprocket
 2. Settings → API → Webhooks
-3. Add Webhook URL: https://api.thekhatumart.com/api/v1/integrations/shipping/webhook
+3. Add Webhook URL: https://api.nityasamagri.com/api/v1/integrations/shipping/webhook
 4. Select all shipment events
 5. Save
 ```
@@ -365,7 +365,7 @@ GitHub → Your Repo → Settings → Secrets → Actions → New secret
 Add all secrets from `.github/SECRETS.md`:
 - `SERVER_HOST` = your Lightsail static IP
 - `SERVER_USER` = ubuntu
-- `SERVER_SSH_KEY` = contents of khatumart-key.pem
+- `SERVER_SSH_KEY` = contents of nityasamagri-key.pem
 - All Razorpay, Twilio, AWS secrets...
 
 ### 13.2 From now on — deploy with git push
@@ -408,7 +408,7 @@ docker compose restart nginx
 
 ### Update code manually
 ```bash
-cd ~/khatumart
+cd ~/nityasamagri
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api
 docker compose exec api npx prisma migrate deploy
@@ -434,7 +434,7 @@ docker stats  # Per-container resource usage
 
 ### Backup database manually
 ```bash
-docker compose exec postgres pg_dump -U postgres khatumart | gzip > backup_$(date +%Y%m%d).sql.gz
+docker compose exec postgres pg_dump -U postgres nityasamagri | gzip > backup_$(date +%Y%m%d).sql.gz
 ```
 
 ### View Nginx logs
@@ -461,7 +461,7 @@ docker compose exec nginx tail -f /var/log/nginx/error.log
 
 ### Optional: Restrict admin panel to office IP
 ```bash
-nano ~/khatumart/docker/nginx/nginx.prod.conf
+nano ~/nityasamagri/docker/nginx/nginx.prod.conf
 
 # Find the admin server block and uncomment:
 # allow YOUR_OFFICE_IP;
@@ -476,7 +476,7 @@ docker compose restart nginx
 
 ### AWS Lightsail Monitoring
 ```
-Lightsail → khatumart-prod → Metrics
+Lightsail → nityasamagri-prod → Metrics
 → CPU utilization
 → Network in/out
 → Status check
@@ -484,7 +484,7 @@ Lightsail → khatumart-prod → Metrics
 
 ### Set up alerts
 ```
-Lightsail → khatumart-prod → Alarms
+Lightsail → nityasamagri-prod → Alarms
 → Add alarm: CPU > 80% → notify via email
 → Add alarm: Instance status check failed → notify
 ```
@@ -495,7 +495,7 @@ Lightsail → khatumart-prod → Alarms
 
 ### Upgrade Lightsail plan
 ```
-Lightsail → khatumart-prod → Upgrade plan
+Lightsail → nityasamagri-prod → Upgrade plan
 → No data loss
 → 5 minute downtime
 ```
@@ -509,7 +509,7 @@ api:
 
 ### Add a second server
 ```
-Lightsail → Create instance (khatumart-prod-2)
+Lightsail → Create instance (nityasamagri-prod-2)
 → Same setup
 → Add load balancer in Lightsail
 ```
@@ -520,10 +520,10 @@ Lightsail → Create instance (khatumart-prod-2)
 
 ```
 □ All containers running (docker compose ps)
-□ API health check passing (curl https://api.thekhatumart.com/health)
-□ Customer web loading (https://thekhatumart.com)
-□ Admin panel loading (https://admin.thekhatumart.com)
-□ Pandit panel loading (https://pandit.thekhatumart.com)
+□ API health check passing (curl https://api.nityasamagri.com/health)
+□ Customer web loading (https://nityasamagri.com)
+□ Admin panel loading (https://admin.nityasamagri.com)
+□ Pandit panel loading (https://pandit.nityasamagri.com)
 □ SSL certificate valid (green padlock in browser)
 □ Razorpay test payment working
 □ OTP SMS sending (test with your own number)
@@ -577,5 +577,5 @@ docker system prune -af  # Remove unused images/containers
 
 ---
 
-*🪔 TheKhatuMart — Deployed on AWS Lightsail · Mohali, Punjab*
-*Support: support@thekhatumart.com*
+*🪔 nityasamagri — Deployed on AWS Lightsail · Mohali, Punjab*
+*Support: support@nityasamagri.com*

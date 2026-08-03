@@ -717,7 +717,7 @@ export default function AdminDashboard() {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontSize:20 }}>🪔</span>
             <div>
-              <div style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:14, color:C.saffron }}>KhatuMart</div>
+              <div style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:14, color:C.saffron }}>nityasamagri</div>
               <div style={{ fontSize:10, color:C.textLight, letterSpacing:1 }}>ADMIN PANEL</div>
             </div>
           </div>
@@ -745,7 +745,7 @@ export default function AdminDashboard() {
             <div style={{ width:32, height:32, borderRadius:"50%", background:C.saffronBg, border:`2px solid ${C.saffron}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:C.saffron }}>SA</div>
             <div>
               <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Super Admin</div>
-              <div style={{ fontSize:10, color:C.textLight }}>admin@khatumart.com</div>
+              <div style={{ fontSize:10, color:C.textLight }}>admin@nityasamagri.com</div>
             </div>
           </div>
         </div>

@@ -600,7 +600,7 @@ export default function PanditPanel() {
         <div style={{ maxWidth:1200, margin:"0 auto", height:58, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span style={{ fontSize:20 }}>🪔</span>
-            <span style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:15, color:C.saffron }}>TheKhatuMart</span>
+            <span style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:15, color:C.saffron }}>nityasamagri</span>
             <span style={{ color:C.border, margin:"0 6px" }}>›</span>
             <span style={{ fontSize:13, color:C.textMid }}>Pandit Panel</span>
           </div>

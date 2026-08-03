@@ -1,7 +1,7 @@
 {
-  "name": "@khatumart/backend",
+  "name": "@nityasamagri/backend",
   "version": "1.0.0",
-  "description": "TheKhatuMart REST + WebSocket API",
+  "description": "nityasamagri REST + WebSocket API",
   "main": "dist/app.js",
   "scripts": {
     "dev":     "ts-node-dev --respawn --transpile-only src/app.ts",

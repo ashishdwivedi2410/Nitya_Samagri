@@ -101,7 +101,7 @@ export function initWebSocket(server: http.Server) {
     // Send welcome
     socket.send(JSON.stringify({
       event:   "CONNECTED",
-      payload: { message: "Connected to KhatuMart real-time server", timestamp: Date.now() },
+      payload: { message: "Connected to nityasamagri real-time server", timestamp: Date.now() },
     }));
   });
 

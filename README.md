@@ -1,4 +1,4 @@
-# 🪔 TheKhatuMart — Spiritual Commerce Platform
+# 🪔 nityasamagri — Spiritual Commerce Platform
  
 > **Bringing Divinity to Your Doorstep**
 > India's most complete platform for pure puja samagri, verified pandits, and complete puja packages.
@@ -32,14 +32,14 @@
  
 ## 🌟 Overview
  
-TheKhatuMart is a **production-grade, full-stack spiritual e-commerce platform** built for the Indian market. It serves three core user groups:
+nityasamagri is a **production-grade, full-stack spiritual e-commerce platform** built for the Indian market. It serves three core user groups:
  
 | User | Panel | URL |
 |------|-------|-----|
-| 👤 Customer | Storefront | `thekhatumart.com` |
-| 🛠️ Admin | Admin Dashboard | `admin.thekhatumart.com` |
-| 🙏 Pandit Ji | Pandit Panel | `pandit.thekhatumart.com` |
-| 🔌 Developers | REST API | `api.thekhatumart.com` |
+| 👤 Customer | Storefront | `nityasamagri.com` |
+| 🛠️ Admin | Admin Dashboard | `admin.nityasamagri.com` |
+| 🙏 Pandit Ji | Pandit Panel | `pandit.nityasamagri.com` |
+| 🔌 Developers | REST API | `api.nityasamagri.com` |
  
 ### Core Features
 - 🛒 **E-commerce** — 1,250+ puja products with variants, bundles, and festival kits
@@ -56,12 +56,12 @@ TheKhatuMart is a **production-grade, full-stack spiritual e-commerce platform**
 ## 🌐 Live URLs
  
 ```
-Customer Storefront  →  https://thekhatumart.com
-Admin Panel          →  https://admin.thekhatumart.com
-Pandit Panel         →  https://pandit.thekhatumart.com
-REST API             →  https://api.thekhatumart.com
-API Health           →  https://api.thekhatumart.com/health
-WebSocket            →  wss://api.thekhatumart.com/ws
+Customer Storefront  →  https://nityasamagri.com
+Admin Panel          →  https://admin.nityasamagri.com
+Pandit Panel         →  https://pandit.nityasamagri.com
+REST API             →  https://api.nityasamagri.com
+API Health           →  https://api.nityasamagri.com/health
+WebSocket            →  wss://api.nityasamagri.com/ws
 ```
  
 ---
@@ -119,7 +119,7 @@ WebSocket            →  wss://api.thekhatumart.com/ws
 ## 📁 Project Structure
  
 ```
-khatumart/                          # Monorepo root (Turborepo)
+nityasamagri/                          # Monorepo root (Turborepo)
 │
 ├── apps/
 │   ├── web/                        # Customer storefront (Next.js)
@@ -210,8 +210,8 @@ khatumart/                          # Monorepo root (Turborepo)
 - Git
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/khatumart.git
-cd khatumart
+git clone https://github.com/YOUR_USERNAME/nityasamagri.git
+cd nityasamagri
 ```
  
 ### 2. Set up environment variables
@@ -285,7 +285,7 @@ PORT=4000
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002
  
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/khatumart
+DATABASE_URL=postgresql://postgres:password@localhost:5432/nityasamagri
  
 # Redis
 REDIS_HOST=localhost
@@ -310,13 +310,13 @@ TWILIO_PHONE=+1XXXXXXXXXX
  
 # SendGrid (Email)
 SENDGRID_API_KEY=SG.XXXXXXXXXXXXXXXXXXXXXXXX
-SENDGRID_FROM_EMAIL=noreply@thekhatumart.com
+SENDGRID_FROM_EMAIL=noreply@nityasamagri.com
  
 # AWS S3 (Media)
 AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXX
 AWS_SECRET_ACCESS_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 AWS_REGION=ap-south-1
-AWS_S3_BUCKET=khatumart-media
+AWS_S3_BUCKET=nityasamagri-media
 ```
  
 ---
@@ -326,7 +326,7 @@ AWS_S3_BUCKET=khatumart-media
 ### Base URL
 ```
 Development:  http://localhost:4000/api/v1
-Production:   https://api.thekhatumart.com/api/v1
+Production:   https://api.nityasamagri.com/api/v1
 ```
  
 ### Authentication
@@ -421,7 +421,7 @@ GET    /payments/history       My payment history
  
 ### Connect
 ```js
-const ws = new WebSocket(`wss://api.thekhatumart.com/ws?token=${accessToken}`);
+const ws = new WebSocket(`wss://api.nityasamagri.com/ws?token=${accessToken}`);
 ```
  
 ### Events received by customer
@@ -517,15 +517,15 @@ newgrp docker
 # 4. Install Certbot for SSL
 sudo apt install -y certbot
 sudo certbot certonly --standalone \
-  -d thekhatumart.com \
-  -d www.thekhatumart.com \
-  -d admin.thekhatumart.com \
-  -d pandit.thekhatumart.com \
-  -d api.thekhatumart.com
+  -d nityasamagri.com \
+  -d www.nityasamagri.com \
+  -d admin.nityasamagri.com \
+  -d pandit.nityasamagri.com \
+  -d api.nityasamagri.com
  
 # 5. Clone and configure
-git clone https://github.com/YOUR_USERNAME/khatumart.git
-cd khatumart
+git clone https://github.com/YOUR_USERNAME/nityasamagri.git
+cd nityasamagri
 cp backend/.env.example backend/.env
 nano backend/.env   # fill production values
  
@@ -561,8 +561,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build & push Docker image
         run: |
-          docker build -t khatumart/api:latest ./backend
-          docker push khatumart/api:latest
+          docker build -t nityasamagri/api:latest ./backend
+          docker push nityasamagri/api:latest
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
@@ -570,7 +570,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd khatumart
+            cd nityasamagri
             git pull origin main
             docker compose -f docker-compose.yml \
                            -f docker-compose.prod.yml \
@@ -592,7 +592,7 @@ jobs:
 RAZORPAY_KEY_ID=rzp_live_XXXXX
 RAZORPAY_KEY_SECRET=XXXXX
 # 4. Dashboard → Webhooks → Add webhook URL:
-#    https://api.thekhatumart.com/api/v1/payments/webhook
+#    https://api.nityasamagri.com/api/v1/payments/webhook
 # 5. Select events: payment.captured, payment.failed, refund.processed
 ```
  
@@ -660,14 +660,14 @@ MIT License — see [LICENSE](LICENSE) for details.
  
 ## 🙏 Support
  
-- **Email:** support@thekhatumart.com
+- **Email:** support@nityasamagri.com
 - **Phone:** +91 8595427053
 - **WhatsApp:** +91 8595427053
 - **Location:** Mohali, Punjab, India
 ---
  
 <div align="center">
-  <strong>🪔 TheKhatuMart — Simplifying Your Spiritual Journey 🪔</strong><br/>
+  <strong>🪔 nityasamagri — Simplifying Your Spiritual Journey 🪔</strong><br/>
   Built with ❤️ in India
 </div>
 

@@ -66,7 +66,7 @@ app.use(errorHandler);
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT) || 4000;
 server.listen(PORT, () => {
-  logger.info(`🪔 KhatuMart API running on port ${PORT}`);
+  logger.info(`🪔 nityasamagri API running on port ${PORT}`);
   logger.info(`📡 WebSocket server ready`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
 });

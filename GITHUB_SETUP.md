@@ -1,9 +1,9 @@
-# TheKhatuMart — GitHub Repository Structure & Deployment Guide
+# nityasamagri — GitHub Repository Structure & Deployment Guide
 
 ## 📁 Exact Folder Structure (copy files here)
 
 ```
-khatumart/                              ← GitHub repo root
+nityasamagri/                              ← GitHub repo root
 │
 ├── .github/
 │   └── workflows/
@@ -96,7 +96,7 @@ khatumart/                              ← GitHub repo root
 
 ```bash
 # Go to github.com → New Repository
-# Name: khatumart
+# Name: nityasamagri
 # Private: YES (production code)
 # Do NOT add README (we'll push our own)
 ```
@@ -105,14 +105,14 @@ khatumart/                              ← GitHub repo root
 
 ```bash
 # Create project folder
-mkdir khatumart && cd khatumart
+mkdir nityasamagri && cd nityasamagri
 
 # Initialize git
 git init
 git branch -M main
 
 # Connect to GitHub
-git remote add origin https://github.com/YOUR_USERNAME/khatumart.git
+git remote add origin https://github.com/YOUR_USERNAME/nityasamagri.git
 ```
 
 ### STEP 3 — Create the folder structure
@@ -236,7 +236,7 @@ EOF
 
 ```bash
 git add .
-git commit -m "🪔 Initial commit — TheKhatuMart production platform"
+git commit -m "🪔 Initial commit — nityasamagri production platform"
 git push -u origin main
 ```
 
@@ -261,7 +261,7 @@ Add these in your GitHub repo settings before CI/CD works:
 | `SENDGRID_API_KEY` | SG.XXXXX |
 | `AWS_ACCESS_KEY_ID` | your AWS key |
 | `AWS_SECRET_ACCESS_KEY` | your AWS secret |
-| `AWS_S3_BUCKET` | khatumart-media |
+| `AWS_S3_BUCKET` | nityasamagri-media |
 | `SERVER_HOST` | your server IP |
 | `SERVER_USER` | ubuntu |
 | `SERVER_SSH_KEY` | your private SSH key |
@@ -272,8 +272,8 @@ Add these in your GitHub repo settings before CI/CD works:
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/khatumart.git
-cd khatumart
+git clone https://github.com/YOUR_USERNAME/nityasamagri.git
+cd nityasamagri
 
 # Copy env files
 cp backend/.env.example backend/.env
@@ -306,19 +306,19 @@ docker compose exec api npm run seed
 sudo apt update && sudo apt install -y docker.io docker-compose-plugin certbot
 
 # Clone repo on server
-git clone https://github.com/YOUR_USERNAME/khatumart.git
-cd khatumart
+git clone https://github.com/YOUR_USERNAME/nityasamagri.git
+cd nityasamagri
 
 # Create production env
 cp backend/.env.example backend/.env
 nano backend/.env   # fill all values
 
 # Get SSL certificate
-sudo certbot certonly --standalone -d thekhatumart.com \
-  -d www.thekhatumart.com \
-  -d admin.thekhatumart.com \
-  -d pandit.thekhatumart.com \
-  -d api.thekhatumart.com
+sudo certbot certonly --standalone -d nityasamagri.com \
+  -d www.nityasamagri.com \
+  -d admin.nityasamagri.com \
+  -d pandit.nityasamagri.com \
+  -d api.nityasamagri.com
 
 # Start production stack
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d

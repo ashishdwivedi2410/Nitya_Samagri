@@ -1,5 +1,5 @@
 // apps/pandit/app/layout.tsx
-// Pandit Ji Panel — TheKhatuMart
+// Pandit Ji Panel — nityasamagri
 
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
@@ -19,8 +19,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title:       "KhatuMart Pandit Panel",
-  description: "Manage your bookings, availability and earnings — TheKhatuMart",
+  title:       "nityasamagri Pandit Panel",
+  description: "Manage your bookings, availability and earnings — nityasamagri",
   robots:      { index: false, follow: false },
   manifest:    "/manifest.json",
   icons: {

@@ -1,12 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# docker-compose.yml — KhatuMart full stack local development
+# docker-compose.yml — nityasamagri full stack local development
 # Run: docker compose up -d
 # ─────────────────────────────────────────────────────────────────────────────
 
 version: "3.9"
 
 networks:
-  khatumart:
+  nityasamagri:
     driver: bridge
 
 volumes:
@@ -20,21 +20,21 @@ services:
   # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: khatumart_postgres
+    container_name: nityasamagri_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       khatumart
+      POSTGRES_DB:       nityasamagri
       POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-khatumart_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nityasamagri_dev}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     networks:
-      - khatumart
+      - nityasamagri
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d khatumart"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nityasamagri"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,11 +42,11 @@ services:
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: khatumart_redis
+    container_name: nityasamagri_redis
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-khatumart_redis}
+      --requirepass ${REDIS_PASSWORD:-nityasamagri_redis}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
@@ -55,9 +55,9 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - khatumart
+      - nityasamagri
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-khatumart_redis}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nityasamagri_redis}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,19 +65,19 @@ services:
   # ── MinIO (S3-compatible local media storage) ───────────────────────────────
   minio:
     image: minio/minio:latest
-    container_name: khatumart_minio
+    container_name: nityasamagri_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-khatumart}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-khatumart_minio}
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-nityasamagri}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nityasamagri_minio}
     volumes:
       - minio_data:/data
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # MinIO Console
     networks:
-      - khatumart
+      - nityasamagri
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -90,14 +90,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    container_name: khatumart_api
+    container_name: nityasamagri_api
     restart: unless-stopped
     env_file: ./backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-khatumart_dev}@postgres:5432/khatumart
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-nityasamagri_dev}@postgres:5432/nityasamagri
       REDIS_HOST:   redis
       REDIS_PORT:   6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-khatumart_redis}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nityasamagri_redis}
       NODE_ENV:     development
     volumes:
       - ./backend/src:/app/src:ro
@@ -105,7 +105,7 @@ services:
     ports:
       - "4000:4000"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       target: development
-    container_name: khatumart_web
+    container_name: nityasamagri_web
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL:     http://localhost:4000/api/v1
@@ -132,7 +132,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       - api
 
@@ -142,7 +142,7 @@ services:
       context: ./apps/admin
       dockerfile: Dockerfile
       target: development
-    container_name: khatumart_admin
+    container_name: nityasamagri_admin
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
@@ -154,7 +154,7 @@ services:
     ports:
       - "3001:3000"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       - api
 
@@ -164,7 +164,7 @@ services:
       context: ./apps/pandit
       dockerfile: Dockerfile
       target: development
-    container_name: khatumart_pandit
+    container_name: nityasamagri_pandit
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
@@ -176,14 +176,14 @@ services:
     ports:
       - "3002:3000"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       - api
 
   # ── Nginx reverse proxy ─────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
-    container_name: khatumart_nginx
+    container_name: nityasamagri_nginx
     restart: unless-stopped
     volumes:
       - ./docker/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
@@ -191,7 +191,7 @@ services:
     ports:
       - "80:80"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       - web
       - api
@@ -199,15 +199,15 @@ services:
   # ── pgAdmin (DB GUI) ────────────────────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: khatumart_pgadmin
+    container_name: nityasamagri_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL:    admin@khatumart.com
+      PGADMIN_DEFAULT_EMAIL:    admin@nityasamagri.com
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
       - "5050:80"
     networks:
-      - khatumart
+      - nityasamagri
     depends_on:
       - postgres
     profiles:

@@ -62,7 +62,7 @@ COPY --chown=nodejs:nodejs <<'EOF' ./entrypoint.sh
 set -e
 echo "🔄 Running Prisma migrations..."
 npx prisma migrate deploy
-echo "🪔 Starting KhatuMart API..."
+echo "🪔 Starting nityasamagri API..."
 exec "$@"
 EOF
 RUN chmod +x ./entrypoint.sh

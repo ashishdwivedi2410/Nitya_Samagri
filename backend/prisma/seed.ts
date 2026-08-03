@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// prisma/seed.ts — TheKhatuMart complete database seed
+// prisma/seed.ts — nityasamagri complete database seed
 // Run: npx ts-node prisma/seed.ts  OR  npm run seed
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🪔 Seeding TheKhatuMart database...\n");
+  console.log("🪔 Seeding nityasamagri database...\n");
 
   // ── 1. CATEGORIES ──────────────────────────────────────────────────────────
   console.log("📂 Creating categories...");
@@ -23,7 +23,7 @@ async function main() {
         description: "Complete range of authentic puja materials for all Hindu ceremonies.",
         imageUrl: "/images/categories/puja-samagri.jpg",
         sortOrder: 1, isActive: true,
-        seoTitle: "Buy Pure Puja Samagri Online | TheKhatuMart",
+        seoTitle: "Buy Pure Puja Samagri Online | nityasamagri",
         seoDesc: "Shop authentic temple-grade puja materials delivered to your door.",
       },
     }),
@@ -35,7 +35,7 @@ async function main() {
         description: "Pure A2 cow ghee, sesame oil, mustard oil for puja and havan.",
         imageUrl: "/images/categories/ghee.jpg",
         sortOrder: 2, isActive: true,
-        seoTitle: "Buy Pure Cow Ghee for Puja Online | TheKhatuMart",
+        seoTitle: "Buy Pure Cow Ghee for Puja Online | nityasamagri",
         seoDesc: "Bilona method A2 ghee for havan, deepak, abhishek and cooking.",
       },
     }),
@@ -138,7 +138,7 @@ async function main() {
       mrp: 349, price: 299, costPrice: 180, gstPct: 5, hsnCode: "0405",
       stock: 240, lowStockAt: 20, weight: 550, isFeatured: true, status: "active" as const,
       tags: ["best-seller", "a2-ghee", "havan", "bilona", "organic"],
-      seoTitle: "Buy Pure A2 Cow Ghee for Puja Online | TheKhatuMart",
+      seoTitle: "Buy Pure A2 Cow Ghee for Puja Online | nityasamagri",
       seoDesc: "100% pure A2 Bilona ghee from Gir cows. Temple-grade quality for havan, deepak & cooking.",
       variants: [
         { label: "250ml", sku: "GHEE-A2-250", price: 179, mrp: 220, stock: 80 },
@@ -165,7 +165,7 @@ async function main() {
       mrp: 649, price: 499, costPrice: 300, gstPct: 5, hsnCode: "1211",
       stock: 145, lowStockAt: 10, weight: 1100, isFeatured: true, status: "active" as const,
       tags: ["best-seller", "hawan", "vedic", "herbs"],
-      seoTitle: "Complete Hawan Samagri Kit Online | TheKhatuMart",
+      seoTitle: "Complete Hawan Samagri Kit Online | nityasamagri",
       seoDesc: "24 sacred Vedic herbs for all havan ceremonies. Authentic Ayurvedic preparation.",
       variants: [
         { label: "500g Kit", sku: "HAWAN-KIT-500", price: 499, mrp: 649, stock: 80 },
@@ -205,7 +205,7 @@ async function main() {
       mrp: 599, price: 449, costPrice: 270, gstPct: 5, hsnCode: "3307",
       stock: 95, lowStockAt: 10, weight: 1500, isFeatured: true, status: "active" as const,
       tags: ["satyanarayan", "puja-kit", "complete", "festival"],
-      seoTitle: "Satyanarayan Puja Kit Online | Complete Materials | TheKhatuMart",
+      seoTitle: "Satyanarayan Puja Kit Online | Complete Materials | nityasamagri",
       seoDesc: "Complete Satyanarayan Puja kit with all required materials. Delivered to your door.",
     },
     {
@@ -384,7 +384,7 @@ async function main() {
   // ── 3. USERS ───────────────────────────────────────────────────────────────
   console.log("👥 Creating users...");
 
-  const hashedPassword = await bcrypt.hash("KhatuMart@2026", 12);
+  const hashedPassword = await bcrypt.hash("nityasamagri@2026", 12);
 
   const users = await Promise.all([
     // Super Admin
@@ -393,7 +393,7 @@ async function main() {
       update: {},
       create: {
         name: "Super Admin", phone: "+919999000001",
-        email: "admin@thekhatumart.com",
+        email: "admin@nityasamagri.com",
         password: hashedPassword, role: "super_admin",
         isVerified: true, status: "active",
         loyaltyPoints: 0, loyaltyTier: "platinum",
@@ -405,7 +405,7 @@ async function main() {
       update: {},
       create: {
         name: "Store Manager", phone: "+919999000002",
-        email: "manager@thekhatumart.com",
+        email: "manager@nityasamagri.com",
         password: hashedPassword, role: "admin",
         isVerified: true, status: "active",
         loyaltyPoints: 0,
@@ -617,7 +617,7 @@ async function main() {
   console.log(`   Coupons    : ${coupons.length}`);
   console.log("─────────────────────────────────────\n");
   console.log("🔑 Login credentials (all users):");
-  console.log("   Password: KhatuMart@2026\n");
+  console.log("   Password: nityasamagri@2026\n");
   console.log("   Super Admin : +919999000001");
   console.log("   Admin       : +919999000002");
   console.log("   Customer 1  : +919876543210  (Rahul Sharma — Gold)");

@@ -1,5 +1,5 @@
 // apps/admin/app/layout.tsx
-// Admin Panel — TheKhatuMart
+// Admin Panel — nityasamagri
 
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
@@ -19,8 +19,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title:       "KhatuMart Admin Panel",
-  description: "Manage orders, products, users and reports for TheKhatuMart",
+  title:       "nityasamagri Admin Panel",
+  description: "Manage orders, products, users and reports for nityasamagri",
   robots:      { index: false, follow: false }, // never index admin panel
   icons: {
     icon:     "/favicon.ico",

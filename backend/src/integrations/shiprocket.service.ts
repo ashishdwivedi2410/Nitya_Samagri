@@ -164,7 +164,7 @@ export class ShiprocketService {
       order_date:     params.orderDate,
       pickup_location:"Primary",             // configured in Shiprocket dashboard
       channel_id:     "",
-      comment:        "KhatuMart Order",
+      comment:        "nityasamagri Order",
       billing_customer_name:    params.customer.name,
       billing_last_name:        "",
       billing_address:          params.customer.address,

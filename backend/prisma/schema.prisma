@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// prisma/schema.prisma — TheKhatuMart full database schema
+// prisma/schema.prisma — nityasamagri full database schema
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {

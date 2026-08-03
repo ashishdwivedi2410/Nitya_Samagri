@@ -298,8 +298,8 @@ router.post("/shipping/webhook", asyncHandler(async (req: Request, res: Response
           select: { phone: true, name: true },
         });
         const msgs: Record<string, string> = {
-          out_for_delivery: `Hi ${user?.name}! Your KhatuMart order ${order.orderId} is out for delivery. Expect it today! 🚚`,
-          delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. 🙏 Thank you for shopping with TheKhatuMart!`,
+          out_for_delivery: `Hi ${user?.name}! Your nityasamagri order ${order.orderId} is out for delivery. Expect it today! 🚚`,
+          delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. 🙏 Thank you for shopping with nityasamagri!`,
         };
         if (user?.phone && msgs[internalStatus]) {
           sendSMS(user.phone, msgs[internalStatus]).catch(() => {});

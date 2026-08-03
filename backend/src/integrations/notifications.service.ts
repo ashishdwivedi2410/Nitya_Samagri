@@ -69,7 +69,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "otp_verification",
     language: "en",
     smsText: ({ otp }) =>
-      `${otp} is your KhatuMart OTP. Valid for 10 minutes. Do not share with anyone. - TheKhatuMart`,
+      `${otp} is your nityasamagri OTP. Valid for 10 minutes. Do not share with anyone. - nityasamagri`,
     waParams: ({ otp }) => [otp, "10"],
   },
 
@@ -77,7 +77,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "welcome_message",
     language: "hi",
     smsText: ({ name, points }) =>
-      `Jai Shri Ram! Welcome to TheKhatuMart, ${name}! 🪔 ${points} reward points added to your account. Shop puja samagri & book pandits at thekhatumart.com`,
+      `Jai Shri Ram! Welcome to nityasamagri, ${name}! 🪔 ${points} reward points added to your account. Shop puja samagri & book pandits at nityasamagri.com`,
     waParams: ({ name, points }) => [name, points],
   },
 
@@ -87,7 +87,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_confirmed",
     language: "hi",
     smsText: ({ name, orderId, amount, eta }) =>
-      `${name} ji, aapka order ${orderId} confirm ho gaya! 🪔 Amount: ₹${amount}. Estimated delivery: ${eta}. Track: thekhatumart.com/track/${orderId}`,
+      `${name} ji, aapka order ${orderId} confirm ho gaya! 🪔 Amount: ₹${amount}. Estimated delivery: ${eta}. Track: nityasamagri.com/track/${orderId}`,
     waParams: ({ name, orderId, amount, eta }) => [name, orderId, amount, eta],
   },
 
@@ -95,7 +95,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_confirmed",
     language: "hi",
     smsText: ({ name, orderId }) =>
-      `${name} ji, aapka order ${orderId} pack ho gaya aur courier ke liye ready hai! 📦 Jald hi aapke paas pahuchega. - TheKhatuMart`,
+      `${name} ji, aapka order ${orderId} pack ho gaya aur courier ke liye ready hai! 📦 Jald hi aapke paas pahuchega. - nityasamagri`,
     waParams: ({ name, orderId }) => [name, orderId],
   },
 
@@ -103,7 +103,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_shipped",
     language: "hi",
     smsText: ({ name, orderId, courier, awb, eta }) =>
-      `${name} ji, aapka order ${orderId} ship ho gaya! 🚚 Courier: ${courier} | AWB: ${awb} | ETA: ${eta}. Track: thekhatumart.com/track/${awb}`,
+      `${name} ji, aapka order ${orderId} ship ho gaya! 🚚 Courier: ${courier} | AWB: ${awb} | ETA: ${eta}. Track: nityasamagri.com/track/${awb}`,
     waParams: ({ name, orderId, courier, awb, eta }) => [name, orderId, courier, awb, eta],
   },
 
@@ -111,7 +111,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_out_for_delivery",
     language: "hi",
     smsText: ({ name, orderId }) =>
-      `${name} ji, aapka order ${orderId} delivery ke liye nikal gaya hai! 🏍️ Aaj hi aapke ghar pahuchega. Ghar par rahein. - TheKhatuMart`,
+      `${name} ji, aapka order ${orderId} delivery ke liye nikal gaya hai! 🏍️ Aaj hi aapke ghar pahuchega. Ghar par rahein. - nityasamagri`,
     waParams: ({ name, orderId }) => [name, orderId],
   },
 
@@ -119,7 +119,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_delivered",
     language: "hi",
     smsText: ({ name, orderId }) =>
-      `${name} ji, aapka order ${orderId} deliver ho gaya! ✅ 🙏 Dhanyawad TheKhatuMart par shopping karne ke liye. Review dijiye: thekhatumart.com/review`,
+      `${name} ji, aapka order ${orderId} deliver ho gaya! ✅ 🙏 Dhanyawad nityasamagri par shopping karne ke liye. Review dijiye: nityasamagri.com/review`,
     waParams: ({ name, orderId }) => [name, orderId],
   },
 
@@ -127,7 +127,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_cancelled",
     language: "hi",
     smsText: ({ name, orderId, reason }) =>
-      `${name} ji, aapka order ${orderId} cancel ho gaya. Karan: ${reason}. Refund 5-7 business days mein aapke account mein aayega. - TheKhatuMart`,
+      `${name} ji, aapka order ${orderId} cancel ho gaya. Karan: ${reason}. Refund 5-7 business days mein aapke account mein aayega. - nityasamagri`,
     waParams: ({ name, orderId, reason }) => [name, orderId, reason],
   },
 
@@ -137,7 +137,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "payment_success",
     language: "en",
     smsText: ({ name, orderId, amount, paymentId }) =>
-      `Payment of ₹${amount} received for order ${orderId}. Payment ID: ${paymentId}. Your puja samagri is being prepared! 🪔 - TheKhatuMart`,
+      `Payment of ₹${amount} received for order ${orderId}. Payment ID: ${paymentId}. Your puja samagri is being prepared! 🪔 - nityasamagri`,
     waParams: ({ name, orderId, amount, paymentId }) => [name, amount, orderId, paymentId],
   },
 
@@ -145,7 +145,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "payment_failed",
     language: "en",
     smsText: ({ name, orderId, amount }) =>
-      `Payment of ₹${amount} failed for order ${orderId}. Please retry at thekhatumart.com/orders or contact support: 8595427053 - TheKhatuMart`,
+      `Payment of ₹${amount} failed for order ${orderId}. Please retry at nityasamagri.com/orders or contact support: 8595427053 - nityasamagri`,
     waParams: ({ name, orderId, amount }) => [name, orderId, amount],
   },
 
@@ -153,7 +153,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "refund_initiated",
     language: "en",
     smsText: ({ name, orderId, amount, days }) =>
-      `Refund of ₹${amount} initiated for order ${orderId}. Amount will reflect in ${days} business days. Refund ID saved in your account. - TheKhatuMart`,
+      `Refund of ₹${amount} initiated for order ${orderId}. Amount will reflect in ${days} business days. Refund ID saved in your account. - nityasamagri`,
     waParams: ({ name, orderId, amount, days }) => [name, orderId, amount, days],
   },
 
@@ -172,7 +172,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "booking_reminder",
     language: "hi",
     smsText: ({ name, ceremony, panditName, time, address }) =>
-      `Reminder: Aapki ${ceremony} kal ${time} baje hai. 🪔 Pandit ${panditName} aayenge. Address: ${address}. Koi sawaal? Call: 8595427053 - TheKhatuMart`,
+      `Reminder: Aapki ${ceremony} kal ${time} baje hai. 🪔 Pandit ${panditName} aayenge. Address: ${address}. Koi sawaal? Call: 8595427053 - nityasamagri`,
     waParams: ({ name, ceremony, panditName, time, address }) =>
       [name, ceremony, time, panditName, address],
   },
@@ -181,7 +181,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "booking_completed",
     language: "hi",
     smsText: ({ name, ceremony, panditName }) =>
-      `${name} ji, aapki ${ceremony} safaltapoorvak sampann hui! 🙏 Pandit ${panditName} ko review dijiye: thekhatumart.com/review. Dhanyawad! - TheKhatuMart`,
+      `${name} ji, aapki ${ceremony} safaltapoorvak sampann hui! 🙏 Pandit ${panditName} ko review dijiye: nityasamagri.com/review. Dhanyawad! - nityasamagri`,
     waParams: ({ name, ceremony, panditName }) => [name, ceremony, panditName],
   },
 
@@ -189,7 +189,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "booking_cancelled",
     language: "hi",
     smsText: ({ name, bookingId, ceremony, reason }) =>
-      `${name} ji, aapki ${ceremony} booking (${bookingId}) cancel ho gayi. Karan: ${reason}. Refund aapke account mein aayega. - TheKhatuMart`,
+      `${name} ji, aapki ${ceremony} booking (${bookingId}) cancel ho gayi. Karan: ${reason}. Refund aapke account mein aayega. - nityasamagri`,
     waParams: ({ name, bookingId, ceremony, reason }) => [name, ceremony, bookingId, reason],
   },
 
@@ -199,7 +199,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "pandit_new_booking",
     language: "hi",
     smsText: ({ panditName, ceremony, customerName, date, time, address }) =>
-      `Namaskar ${panditName} ji! Naya booking request: ${ceremony} | Customer: ${customerName} | Date: ${date} | Time: ${time} | Address: ${address}. Accept/Reject: thekhatumart.com/pandit`,
+      `Namaskar ${panditName} ji! Naya booking request: ${ceremony} | Customer: ${customerName} | Date: ${date} | Time: ${time} | Address: ${address}. Accept/Reject: nityasamagri.com/pandit`,
     waParams: ({ panditName, ceremony, customerName, date, time, address }) =>
       [panditName, ceremony, customerName, date, time, address],
   },
@@ -208,7 +208,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "pandit_payout",
     language: "hi",
     smsText: ({ panditName, amount, payoutId, bankName }) =>
-      `Namaskar ${panditName} ji! ₹${amount} ka payout aapke ${bankName} account mein transfer ho gaya. Payout ID: ${payoutId}. - TheKhatuMart`,
+      `Namaskar ${panditName} ji! ₹${amount} ka payout aapke ${bankName} account mein transfer ho gaya. Payout ID: ${payoutId}. - nityasamagri`,
     waParams: ({ panditName, amount, payoutId, bankName }) =>
       [panditName, amount, payoutId, bankName],
   },
@@ -219,7 +219,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "festival_offer",
     language: "hi",
     smsText: ({ name, festival, discount, code, expiry }) =>
-      `${name} ji, ${festival} ki shubhkamnayein! 🪔 ${discount}% ki special chhoot. Coupon: ${code}. Offer ${expiry} tak valid. Shop: thekhatumart.com - TheKhatuMart`,
+      `${name} ji, ${festival} ki shubhkamnayein! 🪔 ${discount}% ki special chhoot. Coupon: ${code}. Offer ${expiry} tak valid. Shop: nityasamagri.com - nityasamagri`,
     waParams: ({ name, festival, discount, code, expiry }) =>
       [name, festival, discount, code, expiry],
   },
@@ -230,7 +230,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "low_stock_alert",
     language: "en",
     smsText: ({ productName, currentStock, sku }) =>
-      `⚠️ LOW STOCK ALERT: ${productName} (SKU: ${sku}) has only ${currentStock} units left. Please restock immediately. - KhatuMart System`,
+      `⚠️ LOW STOCK ALERT: ${productName} (SKU: ${sku}) has only ${currentStock} units left. Please restock immediately. - nityasamagri System`,
     waParams: ({ productName, sku, currentStock }) => [productName, sku, currentStock],
   },
 

@@ -233,7 +233,7 @@ export default function PanditBooking() {
         <div style={{ maxWidth:1100, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span style={{ fontSize:22 }}>🪔</span>
-            <span style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:17, color:C.saffron }}>TheKhatuMart</span>
+            <span style={{ fontFamily:"'Georgia',serif", fontWeight:700, fontSize:17, color:C.saffron }}>nityasamagri</span>
             <span style={{ color:C.creamDark, margin:"0 6px" }}>›</span>
             <span style={{ fontSize:14, color:C.textMid, fontWeight:500 }}>Book a Pandit</span>
           </div>
