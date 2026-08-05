@@ -32,13 +32,12 @@
  
 ## 🌟 Overview
  
-nityasamagri is a **production-grade, full-stack spiritual e-commerce platform** built for the Indian market. It serves three core user groups:
+nityasamagri is a **production-grade, full-stack spiritual e-commerce platform** built for the Indian market. It serves two core user groups:
  
 | User | Panel | URL |
 |------|-------|-----|
 | 👤 Customer | Storefront | `nityasamagri.com` |
 | 🛠️ Admin | Admin Dashboard | `admin.nityasamagri.com` |
-| 🙏 Pandit Ji | Pandit Panel | `pandit.nityasamagri.com` |
 | 🔌 Developers | REST API | `api.nityasamagri.com` |
  
 ### Core Features
@@ -58,7 +57,6 @@ nityasamagri is a **production-grade, full-stack spiritual e-commerce platform**
 ```
 Customer Storefront  →  https://nityasamagri.com
 Admin Panel          →  https://admin.nityasamagri.com
-Pandit Panel         →  https://pandit.nityasamagri.com
 REST API             →  https://api.nityasamagri.com
 API Health           →  https://api.nityasamagri.com/health
 WebSocket            →  wss://api.nityasamagri.com/ws
@@ -241,7 +239,6 @@ docker compose exec api npm run seed
 cd backend && npm install
 cd ../apps/web && npm install
 cd ../admin && npm install
-cd ../pandit && npm install
  
 # Start PostgreSQL and Redis locally
 # then:
@@ -258,10 +255,6 @@ npm run dev
 # Terminal 3 — Admin
 cd apps/admin
 npm run dev -- -p 3001
- 
-# Terminal 4 — Pandit
-cd apps/pandit
-npm run dev -- -p 3002
 ```
  
 ---
@@ -512,7 +505,6 @@ sudo certbot certonly --standalone \
   -d nityasamagri.com \
   -d www.nityasamagri.com \
   -d admin.nityasamagri.com \
-  -d pandit.nityasamagri.com \
   -d api.nityasamagri.com
  
 # 5. Clone and configure
@@ -662,5 +654,3 @@ MIT License — see [LICENSE](LICENSE) for details.
   <strong>🪔 nityasamagri — Simplifying Your Spiritual Journey 🪔</strong><br/>
   Built with ❤️ in India
 </div>
-
- 

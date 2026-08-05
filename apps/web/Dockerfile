@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # apps/*/Dockerfile — Multi-stage Next.js 14 production build
-# Works for: apps/web, apps/admin, apps/pandit
+# Works for: apps/web, apps/admin
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base ─────────────────────────────────────────────────────────────

@@ -1,11 +1,10 @@
-name: 🛠️ Deploy Admin & Pandit Panels
+name: 🛠️ Deploy Admin Panel
 
 on:
   push:
     branches: [main]
     paths:
       - "apps/admin/**"
-      - "apps/pandit/**"
       - ".github/workflows/deploy-admin.yml"
 
 env:
@@ -48,7 +47,7 @@ jobs:
   deploy:
     name: 🚀 Deploy to Lightsail
     runs-on: ubuntu-latest
-    needs: [build-admin, build-pandit]
+    needs: [build-admin]
     environment:
       name: production
 
@@ -67,18 +66,17 @@ jobs:
             # Pull new images
             docker compose -f docker-compose.yml \
                            -f docker-compose.prod.yml \
-                           pull admin pandit
+                           pull admin
 
-            # Restart admin + pandit
+            # Restart admin
             docker compose -f docker-compose.yml \
                            -f docker-compose.prod.yml \
-                           up -d --no-deps admin pandit
+                           up -d --no-deps admin
 
             sleep 10
 
             # Health checks
             curl -sf https://admin.nityasamagri.com  || exit 1
-            curl -sf https://pandit.nityasamagri.com || exit 1
 
             docker image prune -f
-            echo "✅ Admin and Pandit panels deployed!"
+            echo "✅ Admin panel deployed!"

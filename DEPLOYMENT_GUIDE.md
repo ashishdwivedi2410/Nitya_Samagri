@@ -12,7 +12,6 @@
 |---------|-----|
 | Customer Storefront | https://nityasamagri.com |
 | Admin Panel | https://admin.nityasamagri.com |
-| Pandit Panel | https://pandit.nityasamagri.com |
 | REST API | https://api.nityasamagri.com |
 | WebSocket | wss://api.nityasamagri.com/ws |
 
@@ -273,7 +272,6 @@ nityasamagri_redis     — Up (healthy)
 nityasamagri_api       — Up (healthy)
 nityasamagri_web       — Up
 nityasamagri_admin     — Up
-nityasamagri_pandit    — Up
 nityasamagri_nginx     — Up
 ```
 
@@ -312,7 +310,6 @@ curl https://api.nityasamagri.com/health
 ```bash
 curl -I https://nityasamagri.com
 curl -I https://admin.nityasamagri.com
-curl -I https://pandit.nityasamagri.com
 curl -I https://api.nityasamagri.com/health
 ```
 
@@ -321,7 +318,6 @@ All should return `HTTP/2 200`
 ### 10.3 Open in browser
 - https://nityasamagri.com → Customer storefront
 - https://admin.nityasamagri.com → Admin panel
-- https://pandit.nityasamagri.com → Pandit panel
 
 ---
 
@@ -521,7 +517,6 @@ Lightsail → Create instance (nityasamagri-prod-2)
 □ API health check passing (curl https://api.nityasamagri.com/health)
 □ Customer web loading (https://nityasamagri.com)
 □ Admin panel loading (https://admin.nityasamagri.com)
-□ Pandit panel loading (https://pandit.nityasamagri.com)
 □ SSL certificate valid (green padlock in browser)
 □ Razorpay test payment working
 □ OTP SMS sending (test with your own number)

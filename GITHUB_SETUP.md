@@ -45,15 +45,6 @@ nityasamagri/                              ← GitHub repo root
 │   │   ├── Dockerfile                  ← nextjs.Dockerfile
 │   │   ├── next.config.ts
 │   │   └── package.json
-│   │
-│   └── pandit/                         ← Pandit panel (Next.js)
-│       ├── app/
-│       │   ├── dashboard/
-│       │   │   └── page.tsx            ← PanditPanel.jsx
-│       │   └── layout.tsx
-│       ├── Dockerfile                  ← nextjs.Dockerfile
-│       ├── next.config.ts
-│       └── package.json
 │
 ├── backend/                            ← Node.js REST + WebSocket API
 │   ├── src/
@@ -121,7 +112,6 @@ git remote add origin https://github.com/YOUR_USERNAME/nityasamagri.git
 # Create all directories
 mkdir -p apps/web/app/{product/\[slug\],book-pandit,cart,account,delivery,login,\(home\)}
 mkdir -p apps/admin/app/{dashboard,store}
-mkdir -p apps/pandit/app/dashboard
 mkdir -p backend/src/{modules/{auth,orders,products,payments},websocket}
 mkdir -p backend/prisma
 mkdir -p docker/nginx
@@ -141,7 +131,6 @@ cp DeliveryScheduling.jsx apps/web/app/delivery/page.tsx
 cp AuthPages.jsx         apps/web/app/login/page.tsx
 cp AdminDashboard.jsx    apps/admin/app/dashboard/page.tsx
 cp StoreManagement.jsx   apps/admin/app/store/page.tsx
-cp PanditPanel.jsx       apps/pandit/app/dashboard/page.tsx
 
 # ── BACKEND ───────────────────────────────────────────────
 cp backend/src/app.ts              backend/src/app.ts
@@ -162,7 +151,6 @@ cp devops/docker-compose.prod.yml  docker-compose.prod.yml
 cp devops/docker/backend.Dockerfile backend/Dockerfile
 cp devops/docker/nextjs.Dockerfile  apps/web/Dockerfile
 cp devops/docker/nextjs.Dockerfile  apps/admin/Dockerfile
-cp devops/docker/nextjs.Dockerfile  apps/pandit/Dockerfile
 cp devops/nginx/nginx.prod.conf    docker/nginx/nginx.prod.conf
 ```
 
@@ -291,7 +279,6 @@ docker compose exec api npm run seed
 # Access
 # Customer:  http://localhost:3000
 # Admin:     http://localhost:3001
-# Pandit:    http://localhost:3002
 # API:       http://localhost:4000
 # pgAdmin:   http://localhost:5050
 # MinIO:     http://localhost:9001
@@ -317,7 +304,6 @@ nano backend/.env   # fill all values
 sudo certbot certonly --standalone -d nityasamagri.com \
   -d www.nityasamagri.com \
   -d admin.nityasamagri.com \
-  -d pandit.nityasamagri.com \
   -d api.nityasamagri.com
 
 # Start production stack
@@ -338,8 +324,7 @@ docker compose ps
 |----------|-------|--------|
 | Customer Storefront | 7 pages | ✅ Ready |
 | Admin Dashboard | 2 pages | ✅ Ready |
-| Pandit Panel | 1 page | ✅ Ready |
 | Backend API | 7 TypeScript files | ✅ Ready |
 | Database Schema | 1 Prisma schema | ✅ Ready |
 | DevOps / Docker | 5 config files | ✅ Ready |
-| **Total** | **26 files** | ✅ |
+| **Total** | **25 files** | ✅ |
