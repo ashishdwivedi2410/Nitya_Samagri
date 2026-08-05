@@ -79,27 +79,6 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api.nityasamagri.com/api/v1
 
-  check-pandit:
-    name: 🙏 Pandit — Build Check
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/pandit
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: apps/pandit/package-lock.json
-
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: https://api.nityasamagri.com/api/v1
-
   # ── Security audit ──────────────────────────────────────────────────────────
   security:
     name: 🔒 Security Audit

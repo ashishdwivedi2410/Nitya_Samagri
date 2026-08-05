@@ -133,14 +133,11 @@ nityasamagri/                          # Monorepo root (Turborepo)
 │   │       └── login/              # Auth pages
 │   │
 │   ├── admin/                      # Admin panel (Next.js)
-│   │   └── app/
-│   │       ├── dashboard/          # Admin dashboard
-│   │       └── store/              # Store CMS
-│   │
-│   └── pandit/                     # Pandit Ji panel (Next.js)
 │       └── app/
-│           └── dashboard/          # Pandit dashboard
-│
+│           ├── dashboard/          # Admin dashboard
+│           └── store/              # Store CMS
+│   
+│ 
 ├── backend/                        # Node.js REST + WebSocket API
 │   ├── src/
 │   │   ├── app.ts                  # Express entry point
@@ -186,10 +183,6 @@ nityasamagri/                          # Monorepo root (Turborepo)
 | Admin Dashboard | `AdminDashboard.jsx` | Overview, Orders, Users, Reports with dark professional theme |
 | Store Management | `StoreManagement.jsx` | Homepage CMS, Banners, Festival Campaigns, Blog, SEO, Announcements |
  
-### Pandit Ji Panel (1 page)
-| Page | File | Description |
-|------|------|-------------|
-| Pandit Dashboard | `PanditPanel.jsx` | Dashboard, Bookings, Availability Calendar, Earnings |
  
 ### Backend API (7 modules)
 | Module | Endpoints | Description |
@@ -237,7 +230,6 @@ docker compose exec api npm run seed
 |-----|-----|
 | Customer Storefront | http://localhost:3000 |
 | Admin Panel | http://localhost:3001 |
-| Pandit Panel | http://localhost:3002 |
 | REST API | http://localhost:4000 |
 | API Docs | http://localhost:4000/health |
 | pgAdmin | http://localhost:5050 |

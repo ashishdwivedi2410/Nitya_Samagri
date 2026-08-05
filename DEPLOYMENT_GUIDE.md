@@ -81,7 +81,6 @@ Add these DNS records:
 | A | @ | YOUR_STATIC_IP | 300 |
 | A | www | YOUR_STATIC_IP | 300 |
 | A | admin | YOUR_STATIC_IP | 300 |
-| A | pandit | YOUR_STATIC_IP | 300 |
 | A | api | YOUR_STATIC_IP | 300 |
 
 > ⏳ DNS propagation takes 5–30 minutes. Check with:
@@ -150,7 +149,6 @@ sudo certbot certonly --standalone \
   -d nityasamagri.com \
   -d www.nityasamagri.com \
   -d admin.nityasamagri.com \
-  -d pandit.nityasamagri.com \
   -d api.nityasamagri.com \
   --email admin@nityasamagri.com \
   --agree-tos \
@@ -198,7 +196,7 @@ Fill in ALL values:
 # App
 NODE_ENV=production
 PORT=4000
-ALLOWED_ORIGINS=https://nityasamagri.com,https://admin.nityasamagri.com,https://pandit.nityasamagri.com
+ALLOWED_ORIGINS=https://nityasamagri.com,https://admin.nityasamagri.com
 
 # Database
 DATABASE_URL=postgresql://postgres:YOUR_STRONG_PASSWORD@postgres:5432/nityasamagri

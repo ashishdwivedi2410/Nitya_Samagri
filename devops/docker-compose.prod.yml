@@ -48,14 +48,6 @@ services:
     environment:
       NODE_ENV: production
 
-  pandit:
-    build:
-      target: production
-    command: node server.js
-    volumes: []
-    environment:
-      NODE_ENV: production
-
   nginx:
     volumes:
       - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
