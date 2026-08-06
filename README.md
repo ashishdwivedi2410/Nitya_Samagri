@@ -94,9 +94,9 @@ WebSocket            →  wss://api.nityasamagri.com/ws
 | Cache | Redis 7 |
 | Media | AWS S3 + CloudFront |
 | Proxy | Nginx |
-| Containers | Docker + Docker Compose |
+| Containers | Docker |
 | CI/CD | GitHub Actions |
-| Hosting | AWS EC2 (backend) + Vercel (frontend) |
+| Hosting | AWS LightSail|
 | SSL | Let's Encrypt (Certbot) |
  
 ### Integrations
