@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY:   docker.io
-  IMAGE_NAME: khatumart/web
+  IMAGE_NAME: nityasamagri/web
   NODE_VERSION: "20"
 
 jobs:
@@ -87,6 +87,8 @@ jobs:
       url: https://nityasamagri.com
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -107,3 +109,13 @@ jobs:
             curl -sf https://nityasamagri.com || exit 1
             docker image prune -f
             echo "✅ Customer web deployed!"
+
+      - name: Smoke test
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+        env:
+          SKIP_API:                "1"
+          SKIP_ADMIN:              "1"
+          SMOKE_TEST_RETRIES:      "6"
+          SMOKE_TEST_RETRY_DELAY:  "8"

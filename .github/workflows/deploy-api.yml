@@ -140,6 +140,8 @@ jobs:
       url:  https://api.nityasamagri.com/health
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -175,8 +177,12 @@ jobs:
             docker image prune -f
             echo "✅ API deployed successfully!"
 
-      - name: Verify deployment
+      - name: Smoke test
         run: |
-          sleep 10
-          curl -sf https://api.nityasamagri.com/health
-          echo "✅ Health check passed!"
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+        env:
+          SKIP_WEB:                "1"
+          SKIP_ADMIN:              "1"
+          SMOKE_TEST_RETRIES:      "6"
+          SMOKE_TEST_RETRY_DELAY:  "8"

@@ -14,15 +14,6 @@
 ## DOCKERHUB_TOKEN      Docker Hub access token (not password)
 ##                      → hub.docker.com → Account Settings → Security → New Access Token
 
-## ── VERCEL ───────────────────────────────────────────────────────────────────
-## VERCEL_TOKEN          Vercel personal access token
-##                       → vercel.com → Settings → Tokens → Create
-## VERCEL_ORG_ID         Your Vercel team/org ID
-##                       → vercel.com → Settings → General → Team ID
-## VERCEL_WEB_PROJECT_ID  Vercel project ID for customer web
-## VERCEL_ADMIN_PROJECT_ID Vercel project ID for admin panel
-## VERCEL_PANDIT_PROJECT_ID Vercel project ID for pandit panel
-##                       → vercel.com → Project → Settings → General → Project ID
 
 ## ── SERVER (EC2/VPS) ─────────────────────────────────────────────────────────
 ## SERVER_HOST           Your server IP address e.g. 13.235.100.200
@@ -73,11 +64,6 @@
 ## ─────────────────────────────────────────────────────────────────────────────
 ## □ DOCKERHUB_USERNAME
 ## □ DOCKERHUB_TOKEN
-## □ VERCEL_TOKEN
-## □ VERCEL_ORG_ID
-## □ VERCEL_WEB_PROJECT_ID
-## □ VERCEL_ADMIN_PROJECT_ID
-## □ VERCEL_PANDIT_PROJECT_ID
 ## □ SERVER_HOST
 ## □ SERVER_USER
 ## □ SERVER_SSH_KEY

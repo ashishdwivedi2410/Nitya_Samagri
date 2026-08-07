@@ -1,0 +1,222 @@
+name: 🌙 Scheduled Daily Deploy (Blue/Green)
+
+# Redeploys the current main branch to production once a day, independent of
+# individual pushes. Uses a blue/green flow: the new build goes to whichever
+# color ISN'T currently live, gets migrated and tested directly (over the
+# internal Docker network — nothing public points at it yet), and only then
+# does nginx get switched over to it. The previously-live color keeps
+# serving every real request the entire time, so a bad build never reaches
+# a real user, and if the post-cutover check somehow still fails, "rollback"
+# is just switching nginx back — no rebuild, no redeploy.
+on:
+  schedule:
+    # 18:30 UTC = 00:00 IST — midnight, low-traffic window.
+    - cron: "30 18 * * *"
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: docker.io
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Build & push a single shared tag for all three images ────────────────────
+  build:
+    name: 🐳 Build & Push Images
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        run: echo "tag=$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push API
+        uses: docker/build-push-action@v5
+        with:
+          context:    ./backend
+          file:       ./backend/Dockerfile
+          target:     production
+          push:       true
+          tags:       ${{ env.REGISTRY }}/nityasamagri/api:latest,${{ env.REGISTRY }}/nityasamagri/api:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Build & push Web
+        uses: docker/build-push-action@v5
+        with:
+          context:    ./apps/web
+          file:       ./apps/web/Dockerfile
+          target:     production
+          push:       true
+          tags:       ${{ env.REGISTRY }}/nityasamagri/web:latest,${{ env.REGISTRY }}/nityasamagri/web:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
+            NEXT_PUBLIC_RAZORPAY_KEY=${{ secrets.RAZORPAY_KEY_ID }}
+            NEXT_PUBLIC_APP_URL=https://nityasamagri.com
+
+      - name: Build & push Admin
+        uses: docker/build-push-action@v5
+        with:
+          context:    ./apps/admin
+          file:       ./apps/admin/Dockerfile
+          target:     production
+          push:       true
+          tags:       ${{ env.REGISTRY }}/nityasamagri/admin:latest,${{ env.REGISTRY }}/nityasamagri/admin:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
+            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.com
+
+  # ── Deploy to the idle color, test it directly, cut over if healthy ──────────
+  deploy:
+    name: 🌙 Blue/Green Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: production
+      url:  https://nityasamagri.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deploys the new build to whichever color is idle, runs migrations
+      # against it, then smoke-tests it directly over the internal Docker
+      # network via the `smoketest` service — all before anything public
+      # points at it. This step fails (and nothing below runs except
+      # cleanup) if the idle color doesn't come up healthy.
+      - name: Deploy to idle color & green-test
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          timeout:  300s
+          envs:     NEW_TAG
+          script: |
+            set -e
+            cd ~/nityasamagri
+            git pull origin main
+
+            STATE_FILE=~/nityasamagri/.active_color
+            ACTIVE=$(cat "$STATE_FILE" 2>/dev/null || echo blue)
+            if [ "$ACTIVE" = "blue" ]; then IDLE=green; else IDLE=blue; fi
+            echo "$IDLE" > ~/nityasamagri/.idle_color   # so later steps agree on which color we're testing
+            echo "Currently live: $ACTIVE   Deploying to: $IDLE   Tag: $NEW_TAG"
+
+            for svc in api web admin; do
+              docker pull ${{ env.REGISTRY }}/nityasamagri/$svc:$NEW_TAG
+              docker tag  ${{ env.REGISTRY }}/nityasamagri/$svc:$NEW_TAG ${{ env.REGISTRY }}/nityasamagri/$svc:$IDLE
+            done
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --no-deps api_$IDLE web_$IDLE admin_$IDLE
+
+            sleep 20
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              exec -T api_$IDLE npx prisma migrate deploy
+
+            echo "🔎 Green-testing the idle ($IDLE) containers directly — no public traffic involved yet."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              run --rm --no-deps smoketest "
+                set -e
+                curl -sf --max-time 10 http://api_${IDLE}:4000/health | grep -q '\"status\":\"ok\"'
+                curl -sf --max-time 10 http://api_${IDLE}:4000/api/v1/products > /dev/null
+                curl -sf --max-time 10 http://web_${IDLE}:3000 > /dev/null
+                curl -sf --max-time 10 http://admin_${IDLE}:3000 > /dev/null
+              "
+            echo "✅ Idle color ($IDLE) is healthy."
+        env:
+          NEW_TAG: ${{ needs.build.outputs.tag }}
+
+      # Only runs if the step above succeeded — flips nginx from the old
+      # color to the newly-verified one and reloads. This is the only
+      # moment real traffic starts hitting the new build.
+      - name: Cut traffic over to the new color
+        if: success()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          timeout:  120s
+          script: |
+            set -e
+            cd ~/nityasamagri
+            IDLE=$(cat ~/nityasamagri/.idle_color)
+
+            for svc in api web admin; do
+              cp docker/nginx/active/${svc}-backend.${IDLE}.conf docker/nginx/active/${svc}-backend.conf
+            done
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T nginx nginx -s reload
+
+            echo "$IDLE" > ~/nityasamagri/.active_color
+            echo "✅ Traffic cut over to $IDLE."
+
+      # Confirms the cutover actually worked from the outside — real public
+      # URLs, real SSL termination, real nginx routing. This is the one
+      # check that runs *after* real traffic has moved.
+      - name: Verify public traffic after cutover
+        if: success()
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+        env:
+          SMOKE_TEST_RETRIES:     "6"
+          SMOKE_TEST_RETRY_DELAY: "8"
+
+      # ── Failure paths ──────────────────────────────────────────────────────────
+
+      # The idle color never got real traffic, so "rollback" here is just
+      # cleanup — stop the containers that failed. Nothing a user ever saw.
+      - name: Clean up failed idle deploy (no traffic was ever affected)
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          timeout:  120s
+          script: |
+            cd ~/nityasamagri
+            IDLE=$(cat ~/nityasamagri/.idle_color 2>/dev/null || echo "")
+            ACTIVE=$(cat ~/nityasamagri/.active_color 2>/dev/null || echo blue)
+
+            if [ -n "$IDLE" ] && [ "$IDLE" != "$ACTIVE" ]; then
+              echo "🧹 Stopping unhealthy $IDLE containers — $ACTIVE never stopped serving traffic."
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml stop api_$IDLE web_$IDLE admin_$IDLE || true
+            else
+              # We got here after a successful cutover, meaning the *public*
+              # verification step failed — traffic IS on the bad color.
+              # This is the one case that needs a real rollback.
+              echo "⚠️  Failure happened AFTER cutover — rolling nginx back to the previous color."
+              PREV=$([ "$ACTIVE" = "blue" ] && echo green || echo blue)
+              for svc in api web admin; do
+                cp docker/nginx/active/${svc}-backend.${PREV}.conf docker/nginx/active/${svc}-backend.conf
+              done
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T nginx nginx -s reload
+              echo "$PREV" > ~/nityasamagri/.active_color
+              echo "🔙 Rolled back to $PREV."
+            fi
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "::error::Scheduled deploy failed. If this happened before cutover, production was never affected. If it happened after cutover (rare), nginx has been rolled back to the previous color — check the 'Clean up failed idle deploy' step's log above to see which case this was."
+
+          

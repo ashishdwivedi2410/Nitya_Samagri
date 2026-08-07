@@ -3,14 +3,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router, Request, Response } from "express";
 import { z }   from "zod";
-import { prisma }       from "../config/prisma";
-import { redis }        from "../config/redis";
-import { AppError }     from "../utils/AppError";
-import { asyncHandler } from "../middlewares/async.middleware";
-import { authenticate } from "../middlewares/auth.middleware";
-import { requireRole }  from "../middlewares/rbac.middleware";
-import { validate }     from "../middlewares/validate.middleware";
-import { paginate }     from "../utils/paginate";
+import { prisma }       from "../../config/prisma";
+import { redis }        from "../../config/redis";
+import { AppError }     from "../../utils/AppError";
+import { asyncHandler } from "../../middlewares/async.middleware";
+import { authenticate } from "../../middlewares/auth.middleware";
+import { requireRole }  from "../../middlewares/rbac.middleware";
+import { validate }     from "../../middlewares/validate.middleware";
+import { paginate }     from "../../utils/paginate";
 
 const router = Router();
 const CACHE_TTL = 300; // 5 min

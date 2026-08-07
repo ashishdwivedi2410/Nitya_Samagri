@@ -52,6 +52,8 @@ jobs:
       name: production
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -80,3 +82,13 @@ jobs:
 
             docker image prune -f
             echo "✅ Admin panel deployed!"
+
+      - name: Smoke test
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+        env:
+          SKIP_API:                "1"
+          SKIP_WEB:                "1"
+          SMOKE_TEST_RETRIES:      "6"
+          SMOKE_TEST_RETRY_DELAY:  "8"

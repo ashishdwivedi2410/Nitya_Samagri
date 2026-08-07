@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express from "express";
-import http from "http";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -9,20 +8,20 @@ import { rateLimit } from "express-rate-limit";
 
 import { errorHandler } from "./middlewares/error.middleware";
 import { notFound }     from "./middlewares/notFound.middleware";
-import { initWebSocket } from "./websocket/ws.server";
 import { logger }       from "./utils/logger";
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-import authRoutes     from "./modules/auth/auth.routes";
-import productRoutes  from "./modules/products/product.routes";
-import orderRoutes    from "./modules/orders/order.routes";
-import paymentRoutes  from "./modules/payments/payment.routes";
+import authRoutes         from "./modules/auth/auth.routes";
+import productRoutes      from "./modules/products/product.routes";
+import orderRoutes        from "./modules/orders/order.routes";
+import paymentRoutes      from "./modules/payments/payment.routes";
+import integrationsRoutes from "./integrations/integrations.routes";
 
-const app    = express();
-const server = http.createServer(app);
-
-// ── WebSocket ─────────────────────────────────────────────────────────────────
-initWebSocket(server);
+// This file builds and exports the Express app only — it never binds a port,
+// creates an HTTP server, or opens the WebSocket server. That work belongs to
+// server.ts, so this module can be imported safely by tests (supertest) and
+// anything else that just needs the request-handling pipeline.
+const app = express();
 
 // ── Security & Middleware ─────────────────────────────────────────────────────
 app.use(helmet());
@@ -54,21 +53,14 @@ app.get("/health", (_req, res) => {
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 const API = "/api/v1";
-app.use(`${API}/auth`,     authRoutes);
-app.use(`${API}/products`, productRoutes);
-app.use(`${API}/orders`,   orderRoutes);
-app.use(`${API}/payments`, paymentRoutes);
+app.use(`${API}/auth`,         authRoutes);
+app.use(`${API}/products`,     productRoutes);
+app.use(`${API}/orders`,       orderRoutes);
+app.use(`${API}/payments`,     paymentRoutes);
+app.use(`${API}/integrations`, integrationsRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
-
-// ── Start ─────────────────────────────────────────────────────────────────────
-const PORT = Number(process.env.PORT) || 4000;
-server.listen(PORT, () => {
-  logger.info(`🪔 nityasamagri API running on port ${PORT}`);
-  logger.info(`📡 WebSocket server ready`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-});
 
 export default app;

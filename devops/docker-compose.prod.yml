@@ -1,56 +1,113 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# docker-compose.prod.yml — Production overrides
-# Run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# docker-compose.prod.yml — Production overrides (blue/green)
+#
+# api, web, and admin each run as two containers — a "blue" and a "green"
+# copy — so a deploy always goes to the currently-idle color, gets tested
+# there directly (nothing public points at it yet), and only then does nginx
+# get switched over. The color that was live before stays running and
+# untouched the whole time, so:
+#   - a bad deploy never serves a single real request
+#   - "rollback" is just switching nginx back to the other color and
+#     reloading — no rebuild, no redeploy, seconds not minutes
+#
+# Only ONE color is ever behind nginx at a time; which one is controlled by
+# the include files under docker/nginx/active/ (see deploy-scheduled.yml and
+# rollback.yml). Both containers for a service are always running, though —
+# that's what makes the instant rollback possible.
+#
+# IMPORTANT: because of this, deploy scripts must always name services
+# explicitly (e.g. `up -d --no-deps api_green`), never a bare `up -d` — a
+# bare `up -d` would start every color of every service at once, which is
+# harmless but wasteful and not the intended steady state.
+#
+# Run: docker compose -f docker-compose.yml -f docker-compose.prod.yml <cmd> <service...>
 # ─────────────────────────────────────────────────────────────────────────────
 
 version: "3.9"
 
+x-api-common: &api-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+    target: production
+  env_file: ./backend/.env
+  environment:
+    DATABASE_URL:   postgresql://postgres:${POSTGRES_PASSWORD:-nityasamagri_dev}@postgres:5432/nityasamagri
+    REDIS_HOST:     redis
+    REDIS_PORT:     "6379"
+    REDIS_PASSWORD: ${REDIS_PASSWORD:-nityasamagri_redis}
+    NODE_ENV:       production
+  restart: unless-stopped
+  networks:
+    - nityasamagri
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  # No host port published — only nginx (on the same internal network) can
+  # reach these. The public-facing port is always 80/443 on the nginx service.
+
+x-web-common: &web-common
+  command: node server.js
+  environment:
+    NODE_ENV: production
+  restart: unless-stopped
+  networks:
+    - nityasamagri
+  # No host port published here either — same reasoning as api-common above.
+
 services:
 
-  api:
-    build:
-      target: production
-    command: node dist/app.js
-    volumes: []             # no source mounts in prod
-    environment:
-      NODE_ENV: production
-    deploy:
-      replicas: 2
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-      resources:
-        limits:
-          cpus: "1"
-          memory: 512M
-        reservations:
-          memory: 256M
+  # ── API — blue/green pair ────────────────────────────────────────────────────
+  api_blue:
+    <<: *api-common
+    image: docker.io/nityasamagri/api:blue
+    container_name: nityasamagri_api_blue
 
-  web:
-    build:
-      target: production
-    command: node server.js
-    volumes: []
-    environment:
-      NODE_ENV: production
-    deploy:
-      replicas: 2
-      resources:
-        limits:
-          cpus: "1"
-          memory: 512M
+  api_green:
+    <<: *api-common
+    image: docker.io/nityasamagri/api:green
+    container_name: nityasamagri_api_green
 
-  admin:
-    build:
-      target: production
-    command: node server.js
-    volumes: []
-    environment:
-      NODE_ENV: production
+  # ── Web (customer storefront) — blue/green pair ──────────────────────────────
+  web_blue:
+    <<: *web-common
+    image: docker.io/nityasamagri/web:blue
+    container_name: nityasamagri_web_blue
+
+  web_green:
+    <<: *web-common
+    image: docker.io/nityasamagri/web:green
+    container_name: nityasamagri_web_green
+
+  # ── Admin panel — blue/green pair ─────────────────────────────────────────────
+  admin_blue:
+    <<: *web-common
+    image: docker.io/nityasamagri/admin:blue
+    container_name: nityasamagri_admin_blue
+
+  admin_green:
+    <<: *web-common
+    image: docker.io/nityasamagri/admin:green
+    container_name: nityasamagri_admin_green
+
+  # ── Smoke-test runner ─────────────────────────────────────────────────────────
+  # A throwaway container attached to the same internal network, used to curl
+  # the *idle* color directly (e.g. http://api_green:4000/health) before it
+  # ever gets nginx traffic. Never starts on its own — only via
+  # `docker compose run --rm smoketest ...` from the deploy scripts.
+  smoketest:
+    image: curlimages/curl:latest
+    profiles: ["tools"]
+    networks:
+      - nityasamagri
+    entrypoint: ["/bin/sh", "-c"]
 
   nginx:
     volumes:
       - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/active:/etc/nginx/active
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     ports:
@@ -64,4 +121,3 @@ services:
 
   redis:
     ports: []
-

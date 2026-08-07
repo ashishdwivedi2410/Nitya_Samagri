@@ -8,13 +8,13 @@ import { Router, Request, Response, NextFunction } from "express";
 import bcrypt  from "bcryptjs";
 import jwt     from "jsonwebtoken";
 import { z }   from "zod";
-import { prisma }      from "../config/prisma";
-import { redis }       from "../config/redis";
-import { AppError }    from "../utils/AppError";
-import { asyncHandler } from "../middlewares/async.middleware";
-import { validate }    from "../middlewares/validate.middleware";
-import { authenticate } from "../middlewares/auth.middleware";
-import { sendSMS }     from "../integrations/twilio";
+import { prisma }      from "../../config/prisma";
+import { redis }       from "../../config/redis";
+import { AppError }    from "../../utils/AppError";
+import { asyncHandler } from "../../middlewares/async.middleware";
+import { validate }    from "../../middlewares/validate.middleware";
+import { authenticate } from "../../middlewares/auth.middleware";
+import { sendSMS }     from "../../integrations/twilio";
 
 const router = Router();
 
