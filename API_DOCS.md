@@ -44,7 +44,6 @@ Authorization: Bearer <access_token>
 | Role | Access |
 |------|--------|
 | `customer` | Own orders, bookings, profile |
-| `pandit` | Own bookings, availability, earnings |
 | `admin` | All orders, users, products, reports |
 | `super_admin` | Everything including settings & deletion |
 | `order_manager` | Orders + shipping management |
