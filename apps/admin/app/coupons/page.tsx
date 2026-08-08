@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef } from "react";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -26,7 +28,6 @@ const INIT_COUPONS = [
   { id:"c3", code:"NAVRATRI25",  type:"percent", value:25,   maxDiscount:300,  minOrder:699,  usageLimit:300,  usedCount:300, isActive:false, expiresAt:"2026-10-11", desc:"25% off for Navratri",           applicableTo:"category", category:"festival-kits", festivalTag:"Navratri",createdAt:"1 Sep 2026" },
   { id:"c4", code:"FREESHIP",    type:"shipping",value:0,    maxDiscount:0,    minOrder:0,    usageLimit:1000, usedCount:412, isActive:true,  expiresAt:"2026-12-31", desc:"Free shipping on any order",     applicableTo:"all",      category:"",         festivalTag:"",        createdAt:"1 Jun 2026" },
   { id:"c5", code:"HAWAN30",     type:"percent", value:30,   maxDiscount:150,  minOrder:499,  usageLimit:200,  usedCount:89,  isActive:true,  expiresAt:"2026-12-31", desc:"30% off on hawan products",     applicableTo:"category", category:"hawan-materials",festivalTag:"",   createdAt:"15 Jun 2026"},
-  { id:"c6", code:"PANDIT50",    type:"flat",    value:50,   maxDiscount:50,   minOrder:1500, usageLimit:null, usedCount:56,  isActive:true,  expiresAt:"2026-12-31", desc:"₹50 off on pandit booking",     applicableTo:"booking",  category:"",         festivalTag:"",        createdAt:"1 Jun 2026" },
   { id:"c7", code:"BULK499",     type:"flat",    value:499,  maxDiscount:499,  minOrder:2999, usageLimit:100,  usedCount:12,  isActive:true,  expiresAt:"2026-12-31", desc:"₹499 off orders above ₹2999",   applicableTo:"all",      category:"",         festivalTag:"",        createdAt:"1 Jun 2026" },
   { id:"c8", code:"GHEE10",      type:"percent", value:10,   maxDiscount:80,   minOrder:249,  usageLimit:null, usedCount:203, isActive:true,  expiresAt:"2026-12-31", desc:"10% off on ghee & oils",        applicableTo:"category", category:"ghee-oils", festivalTag:"",        createdAt:"10 Jun 2026"},
 ];
@@ -231,7 +232,7 @@ function CouponForm({ initial, onSave, onCancel }) {
       <div style={{ marginBottom:16 }}>
         <label style={{ display:"block",fontSize:12,fontWeight:700,color:C.textMid,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5 }}>Applicable To</label>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {[["all","All Products"],["category","Specific Category"],["booking","Pandit Booking"]].map(([k,l])=>(
+          {[["all","All Products"],["category","Specific Category"]].map(([k,l])=>(
             <button key={k} onClick={()=>setForm(v=>({...v,applicableTo:k}))}
               style={{ padding:"8px 16px", borderRadius:9, border:`1.5px solid ${form.applicableTo===k?C.saffron:C.border}`, background:form.applicableTo===k?C.saffronBg:"transparent", color:form.applicableTo===k?C.saffron:C.textMid, fontWeight:600, fontSize:12, cursor:"pointer", transition:"all 0.15s" }}>{l}</button>
           ))}

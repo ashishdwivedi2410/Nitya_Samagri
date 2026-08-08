@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
  
 const C = {
@@ -92,27 +94,6 @@ const orders = [
   },
 ];
  
-const bookings = [
-  {
-    id: "#BK-2026-0847", date: "15 Jun 2026", status: "Confirmed",
-    pandit: "Pt. Ramesh Sharma", ceremony: "Griha Pravesh",
-    time: "10:00 AM", address: "B-204 Vasant Kunj, New Delhi",
-    amount: 3799, panditIcon: "🧘",
-  },
-  {
-    id: "#BK-2026-0612", date: "2 May 2026", status: "Completed",
-    pandit: "Pt. Suresh Mishra", ceremony: "Satyanarayan Katha",
-    time: "08:00 AM", address: "B-204 Vasant Kunj, New Delhi",
-    amount: 2500, panditIcon: "🙏",
-  },
-  {
-    id: "#BK-2026-0401", date: "12 Mar 2026", status: "Completed",
-    pandit: "Pt. Ramesh Sharma", ceremony: "Navgrah Shanti Havan",
-    time: "09:00 AM", address: "Temple Road, Saket, New Delhi",
-    amount: 4500, panditIcon: "🧘",
-  },
-];
- 
 const wishlist = [
   { id: 1, name: "Pure Cow Ghee 1L", price: 549, mrp: 649, icon: "🫙", inStock: true },
   { id: 2, name: "Brass Puja Thali Set", price: 799, mrp: 999, icon: "🪙", inStock: true },
@@ -187,11 +168,10 @@ function OverviewView({ setView }) {
       </div>
  
       {/* Stats row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 28 }}>
         {[
           { label: "Total Orders", value: user.totalOrders, icon: "📦", color: C.saffron, bg: C.saffronBg, action: () => setView("orders") },
           { label: "Total Spent", value: `₹${user.totalSpend.toLocaleString()}`, icon: "💰", color: C.gold, bg: C.goldBg, action: null },
-          { label: "Pandit Bookings", value: bookings.length, icon: "🙏", color: C.purple, bg: C.purpleBg, action: () => setView("bookings") },
           { label: "Wishlist Items", value: wishlist.length, icon: "❤️", color: C.red, bg: C.redBg, action: () => setView("wishlist") },
         ].map(s => (
           <div key={s.label} onClick={s.action} style={{ background: s.bg, borderRadius: 14, padding: "18px 20px", border: `1px solid ${s.color}22`, cursor: s.action ? "pointer" : "default", transition: "transform 0.15s" }}
@@ -225,28 +205,6 @@ function OverviewView({ setView }) {
         </div>
       </div>
  
-      {/* Upcoming booking */}
-      {bookings.find(b => b.status === "Confirmed") && (
-        <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "24px" }}>
-          <h3 style={{ fontFamily: "'Georgia',serif", fontSize: 18, color: C.text, margin: "0 0 16px" }}>Upcoming Booking</h3>
-          {(() => { const b = bookings.find(b => b.status === "Confirmed"); return (
-            <div style={{ background: C.saffronBg, borderRadius: 12, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                <span style={{ fontSize: 32 }}>{b.panditIcon}</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{b.ceremony}</div>
-                  <div style={{ fontSize: 12, color: C.textLight }}>{b.pandit} · {b.date} at {b.time}</div>
-                  <div style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>📍 {b.address}</div>
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <StatusBadge status={b.status} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.saffron, marginTop: 6 }}>₹{b.amount.toLocaleString()}</div>
-              </div>
-            </div>
-          ); })()}
-        </div>
-      )}
     </div>
   );
 }
@@ -339,52 +297,6 @@ function OrdersView() {
                 </div>
               </div>
             )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
- 
-function BookingsView() {
-  return (
-    <div>
-      <SectionHeader title="My Pandit Bookings" subtitle={`${bookings.length} ceremonies booked`}
-        action={<button style={{ padding: "9px 18px", borderRadius: 9, background: C.saffron, color: C.white, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>+ New Booking</button>} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {bookings.map(b => (
-          <div key={b.id} style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "20px 24px" }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.cream, border: `2px solid ${C.marigoldLight}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>{b.panditIcon}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: C.text, marginBottom: 2 }}>{b.ceremony}</div>
-                    <div style={{ fontSize: 13, color: C.textLight }}>{b.pandit}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <StatusBadge status={b.status} />
-                    <div style={{ fontSize: 15, fontWeight: 700, color: C.saffron, marginTop: 6 }}>₹{b.amount.toLocaleString()}</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13, color: C.textLight, marginBottom: 14 }}>
-                  <span>📅 {b.date}</span>
-                  <span>⏰ {b.time}</span>
-                  <span>📍 {b.address}</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {b.status === "Confirmed" && <>
-                    <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>🔁 Reschedule</button>
-                    <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.redBg}`, background: C.redBg, color: C.red, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>✕ Cancel</button>
-                  </>}
-                  {b.status === "Completed" && <>
-                    <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>⭐ Rate Pandit</button>
-                    <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.saffronBg}`, background: C.saffronBg, color: C.saffron, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>🔄 Book Again</button>
-                  </>}
-                  <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>📋 View Details</button>
-                </div>
-              </div>
-            </div>
           </div>
         ))}
       </div>
@@ -577,7 +489,7 @@ function ProfileView() {
           <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px 24px" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: "0 0 14px" }}>🔔 Notification Preferences</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {[["Order Updates","SMS & WhatsApp",true],["Festival Offers","Email & SMS",true],["New Pandit Alerts","Email",false],["Review Reminders","Email",true]].map(([name, channel, on]) => (
+              {[["Order Updates","SMS & WhatsApp",true],["Festival Offers","Email & SMS",true],["Review Reminders","Email",true]].map(([name, channel, on]) => (
                 <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: C.cream, borderRadius: 9 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{name}</div>
@@ -604,7 +516,6 @@ function ProfileView() {
 const NAV = [
   { id: "overview",  label: "Overview",         icon: "🏠" },
   { id: "orders",    label: "My Orders",         icon: "📦" },
-  { id: "bookings",  label: "Pandit Bookings",   icon: "🙏" },
   { id: "wishlist",  label: "Wishlist",          icon: "❤️" },
   { id: "addresses", label: "Addresses",         icon: "📍" },
   { id: "rewards",   label: "Rewards",           icon: "🏅" },
@@ -670,7 +581,6 @@ export default function CustomerAccount() {
         <div>
           {view === "overview"  && <OverviewView setView={setView} />}
           {view === "orders"    && <OrdersView />}
-          {view === "bookings"  && <BookingsView />}
           {view === "wishlist"  && <WishlistView />}
           {view === "addresses" && <AddressesView />}
           {view === "rewards"   && <RewardsView />}

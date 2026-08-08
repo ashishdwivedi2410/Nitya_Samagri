@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 
 // ─── THEME: Obsidian + Saffron — dark professional with warm accent ───────────
@@ -34,7 +36,6 @@ const OVERVIEW_STATS = [
   { label:"Revenue (Month)",   value:"₹4.82L",  sub:"+18% vs May",   trend:+18, icon:"💰", color:C.saffron,  bg:C.saffronBg },
   { label:"Total Orders",      value:"1,284",   sub:"↑ 142 today",   trend:+12, icon:"📦", color:C.blue,     bg:C.blueBg    },
   { label:"Active Customers",  value:"8,921",   sub:"+56 new today", trend:+8,  icon:"👥", color:C.green,    bg:C.greenBg   },
-  { label:"Pandit Bookings",   value:"247",     sub:"32 this week",  trend:+22, icon:"🙏", color:C.purple,   bg:C.purpleBg  },
   { label:"Avg Order Value",   value:"₹876",    sub:"+₹42 vs May",  trend:+5,  icon:"📊", color:C.marigold, bg:C.marigoldBg},
   { label:"Pending Orders",    value:"87",      sub:"15 urgent",     trend:-3,  icon:"⏳", color:C.red,      bg:C.redBg     },
 ];
@@ -694,7 +695,6 @@ const SIDEBAR_NAV = [
   ]},
   { group:"Management", items:[
     { id:"products",  label:"Products",     icon:"🏷️", disabled:true },
-    { id:"pandits",   label:"Pandits",      icon:"🙏", disabled:true },
     { id:"inventory", label:"Inventory",    icon:"🏭", disabled:true },
     { id:"coupons",   label:"Coupons",      icon:"🎟️", disabled:true },
   ]},

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 
 // ─── THEME: Dark obsidian sidebar + warm ivory content ────────────────────────
@@ -46,16 +48,15 @@ const S = {
 const BANNERS = [
   { id:"b1", title:"Navratri Mega Sale",    desktop:"🪔", mobile:"🪔", cta:"Shop Now",   url:"/navratri",  status:"active",   start:"1 Oct 2026",  end:"10 Oct 2026", clicks:1240 },
   { id:"b2", title:"Pure Cow Ghee Launch",  desktop:"🫙", mobile:"🫙", cta:"Buy Now",    url:"/ghee",      status:"active",   start:"1 Jun 2026",  end:"30 Jun 2026", clicks:876  },
-  { id:"b3", title:"Book a Pandit Today",   desktop:"🙏", mobile:"🙏", cta:"Book Now",   url:"/pandits",   status:"scheduled",start:"15 Jun 2026", end:"30 Jun 2026", clicks:0    },
   { id:"b4", title:"Diwali Collection 2026",desktop:"✨", mobile:"✨", cta:"Explore",    url:"/diwali",    status:"draft",    start:"15 Oct 2026", end:"5 Nov 2026",  clicks:0    },
 ];
 
 const FESTIVALS = [
-  { id:"f1", name:"Navratri 2026",     icon:"🪔", startDate:"2 Oct 2026",  endDate:"11 Oct 2026", status:"upcoming", products:42, pandits:18, revenue:0,     color:"#D4270C" },
-  { id:"f2", name:"Diwali 2026",       icon:"✨", startDate:"20 Oct 2026", endDate:"24 Oct 2026", status:"draft",    products:68, pandits:24, revenue:0,     color:"#C8860A" },
-  { id:"f3", name:"Janmashtami 2026",  icon:"🦚", startDate:"15 Aug 2026", endDate:"16 Aug 2026", status:"draft",    products:28, pandits:12, revenue:0,     color:"#1A5C9E" },
-  { id:"f4", name:"Shivratri 2026",    icon:"🔱", startDate:"19 Feb 2026", endDate:"20 Feb 2026", status:"completed",products:35, pandits:15, revenue:420000,color:"#6B2EA8" },
-  { id:"f5", name:"Ram Navami 2026",   icon:"🏹", startDate:"6 Apr 2026",  endDate:"6 Apr 2026",  status:"completed",products:22, pandits:10, revenue:185000,color:"#1A7A3C" },
+  { id:"f1", name:"Navratri 2026",     icon:"🪔", startDate:"2 Oct 2026",  endDate:"11 Oct 2026", status:"upcoming", products:42, revenue:0,     color:"#D4270C" },
+  { id:"f2", name:"Diwali 2026",       icon:"✨", startDate:"20 Oct 2026", endDate:"24 Oct 2026", status:"draft",    products:68, revenue:0,     color:"#C8860A" },
+  { id:"f3", name:"Janmashtami 2026",  icon:"🦚", startDate:"15 Aug 2026", endDate:"16 Aug 2026", status:"draft",    products:28, revenue:0,     color:"#1A5C9E" },
+  { id:"f4", name:"Shivratri 2026",    icon:"🔱", startDate:"19 Feb 2026", endDate:"20 Feb 2026", status:"completed",products:35, revenue:420000,color:"#6B2EA8" },
+  { id:"f5", name:"Ram Navami 2026",   icon:"🏹", startDate:"6 Apr 2026",  endDate:"6 Apr 2026",  status:"completed",products:22, revenue:185000,color:"#1A7A3C" },
 ];
 
 const BLOGS = [
@@ -71,7 +72,6 @@ const SECTIONS = [
   { id:"s2", label:"Festival Collections",active:true, sortOrder:2, type:"festival" },
   { id:"s3", label:"Featured Products",  active:true,  sortOrder:3, type:"products" },
   { id:"s4", label:"Best Sellers",       active:true,  sortOrder:4, type:"products" },
-  { id:"s5", label:"Pandit Services",    active:true,  sortOrder:5, type:"pandits"  },
   { id:"s6", label:"New Arrivals",       active:false, sortOrder:6, type:"products" },
   { id:"s7", label:"Testimonials",       active:true,  sortOrder:7, type:"reviews"  },
   { id:"s8", label:"Blog Section",       active:false, sortOrder:8, type:"blog"     },
@@ -84,9 +84,8 @@ const ANNOUNCEMENTS = [
 ];
 
 const SEO_PAGES = [
-  { id:"sp1", page:"Homepage",           title:"nityasamagri — Pure Puja Samagri & Book Pandits Online",           desc:"Order temple-grade puja items & book verified pandits.", score:92 },
+  { id:"sp1", page:"Homepage",           title:"nityasamagri — Pure Puja Samagri Online",                          desc:"Order temple-grade puja items delivered to your door.",  score:92 },
   { id:"sp2", page:"Puja Samagri",       title:"Buy Pure Puja Samagri Online | nityasamagri",                         desc:"Shop authentic puja items delivered to your door.",       score:87 },
-  { id:"sp3", page:"Book Pandit",        title:"Book Verified Pandits Online | nityasamagri",                         desc:"Find experienced pandits for all ceremonies.",            score:78 },
   { id:"sp4", page:"Cow Ghee",           title:"Buy Pure A2 Cow Ghee for Puja Online",                             desc:"Bilona method A2 ghee for havan, deepak & cooking.",     score:95 },
   { id:"sp5", page:"Hawan Samagri",      title:"Hawan Samagri Kit Online | Pure Ingredients",                      desc:"Complete havan kits with all required ingredients.",      score:81 },
 ];
@@ -175,7 +174,7 @@ function HomepageCMS() {
 
   const save = () => { setSaved(true); setTimeout(()=>setSaved(false), 2000); };
 
-  const typeIcon = { banner:"🖼️", festival:"🪔", products:"📦", pandits:"🙏", reviews:"⭐", blog:"📝" };
+  const typeIcon = { banner:"🖼️", festival:"🪔", products:"📦", reviews:"⭐", blog:"📝" };
 
   return (
     <div>
@@ -349,7 +348,7 @@ function FestivalsView() {
   return (
     <div>
       <SectionTitle title="Festival Campaigns"
-        sub="Create seasonal campaigns with products, pandits & discounts"
+        sub="Create seasonal campaigns with products & discounts"
         action={<Btn onClick={()=>setShowNew(v=>!v)}>+ New Campaign</Btn>}
       />
 
@@ -392,7 +391,7 @@ function FestivalsView() {
             <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:S.text, marginBottom:4 }}>{f.name}</div>
             <div style={{ fontSize:12, color:S.textLight, marginBottom:14 }}>📅 {f.startDate} → {f.endDate}</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              {[["📦 Products",f.products],["🙏 Pandits",f.pandits]].map(([label,val])=>(
+              {[["📦 Products",f.products],["🎟️ Coupons",2]].map(([label,val])=>(
                 <div key={label} style={{ background:S.bgHover, borderRadius:8, padding:"8px 10px", textAlign:"center" }}>
                   <div style={{ fontSize:14, fontWeight:700, color:S.text }}>{val}</div>
                   <div style={{ fontSize:10, color:S.textLight }}>{label}</div>
@@ -429,7 +428,7 @@ function FestivalsView() {
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16 }}>
             {[
               { label:"Featured Products", value:selected.products, action:"Manage Products", icon:"📦" },
-              { label:"Assigned Pandits",  value:selected.pandits,  action:"Manage Pandits",  icon:"🙏" },
+              { label:"Social Posts",      value:5,                 action:"Schedule Posts",  icon:"📱" },
               { label:"Active Banners",    value:2,                 action:"Edit Banners",    icon:"🖼️" },
               { label:"Active Coupons",    value:3,                 action:"Edit Coupons",    icon:"🏷️" },
             ].map(item=>(

@@ -21,18 +21,16 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   metadataBase: new URL("https://nityasamagri.com"),
   title: {
-    default:  "nityasamagri — Pure Puja Samagri & Verified Pandits",
+    default:  "nityasamagri — Pure Puja Samagri",
     template: "%s | nityasamagri",
   },
   description:
-    "India's most trusted spiritual commerce platform. Order temple-grade puja samagri, book verified pandits, and get complete puja packages delivered anywhere in India.",
+    "India's most trusted puja samagri platform. Order temple-grade puja samagri and get it delivered anywhere in India.",
   keywords: [
     "puja samagri online",
-    "pandit booking online",
     "hawan samagri",
     "cow ghee for puja",
     "navratri puja kit",
-    "griha pravesh pandit",
     "nityasamagri",
     "online puja store india",
     "buy puja items online",
@@ -50,8 +48,8 @@ export const metadata: Metadata = {
     locale:      "en_IN",
     url:         "https://nityasamagri.com",
     siteName:    "nityasamagri",
-    title:       "nityasamagri — Pure Puja Samagri & Verified Pandits",
-    description: "Order pure puja samagri and book verified pandits online. Delivered anywhere in India.",
+    title:       "nityasamagri — Pure Puja Samagri",
+    description: "Order pure, temple-grade puja samagri online. Delivered anywhere in India.",
     images: [
       {
         url:    "/og-image.jpg",
@@ -63,8 +61,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card:        "summary_large_image",
-    title:       "nityasamagri — Pure Puja Samagri & Verified Pandits",
-    description: "India's spiritual commerce platform.",
+    title:       "nityasamagri — Pure Puja Samagri",
+    description: "India's trusted puja samagri platform.",
     images:      ["/og-image.jpg"],
     creator:     "@nityasamagri",
   },
