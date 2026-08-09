@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router, Request, Response } from "express";
 import { z }   from "zod";
+import { Prisma }        from "@prisma/client";
 import { prisma }        from "../../config/prisma";
 import { AppError }      from "../../utils/AppError";
 import { asyncHandler }  from "../../middlewares/async.middleware";
@@ -15,6 +16,8 @@ import { sendSMS }       from "../../integrations/twilio";
 import { sendEmail }     from "../../integrations/sendgrid";
 
 const router = Router();
+
+type PrismaTx = Prisma.TransactionClient;
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const CreateOrderSchema = z.object({
@@ -59,6 +62,34 @@ function generateOrderId(): string {
   const year  = new Date().getFullYear();
   const rand  = Math.floor(10000 + Math.random() * 90000);
   return `ORD-${year}-${rand}`;
+}
+
+// generateOrderId() has no uniqueness check before insert — a collision is
+// rare but not impossible (90k possible suffixes per year). Order creation
+// retries with a freshly generated ID on that specific failure, up to this
+// many attempts, rather than surfacing a raw 500 to the customer.
+const MAX_ORDER_ID_ATTEMPTS = 5;
+
+function isOrderIdCollision(err: unknown): boolean {
+  const e = err as { code?: string; meta?: { target?: unknown } };
+  if (e?.code !== "P2002") return false;
+  const target = e.meta?.target;
+  return Array.isArray(target) ? target.includes("orderId") : String(target ?? "").includes("orderId");
+}
+
+// Restock whatever an order's line items actually decremented at checkout —
+// the product's own stock for plain items, the specific variant's stock for
+// variant items. Used on any transition into a terminal "items are back in
+// the warehouse" state (customer cancel, admin cancel/return).
+async function restockOrderItems(tx: PrismaTx, orderId: string) {
+  const items = await tx.orderItem.findMany({ where: { orderId } });
+  for (const item of items) {
+    if (item.variantId) {
+      await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.qty } } });
+    } else {
+      await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.qty } } });
+    }
+  }
 }
 
 async function applyCoupon(code: string, subtotal: number) {
@@ -129,68 +160,83 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
 
   const total = Math.round(subtotal + gst + shipping - discount);
 
-  // 4. Create order in transaction
-  const order = await prisma.$transaction(async (tx) => {
-    // Decrement stock (product or variant, matching what was validated above).
-    // Use updateMany with a `stock >= qty` guard instead of a plain update —
-    // this makes the decrement atomic and conditional at the DB level, so two
-    // concurrent checkouts racing for the last unit can't both succeed and
-    // drive stock negative. If the guard fails (someone else beat us to it),
-    // count is 0 and we abort the whole transaction.
-    for (const item of resolvedItems) {
-      if (item.variantId) {
-        const result = await tx.productVariant.updateMany({
-          where: { id: item.variantId, stock: { gte: item.qty } },
-          data:  { stock: { decrement: item.qty } },
-        });
-        if (result.count === 0) {
-          throw new AppError(`Insufficient stock for ${item.product.name} (variant) — please review your cart`, 409);
+  // 4. Create order in transaction. Retried (from scratch, including the
+  // stock decrements) if — and only if — order creation fails specifically
+  // because generateOrderId() collided with an existing order; any other
+  // failure (e.g. the stock guard below) aborts immediately and propagates
+  // as normal. Retrying the whole transaction is safe here: a collision
+  // means the create() never committed, so nothing has actually decremented
+  // yet on that attempt.
+  let order;
+  for (let attempt = 1; attempt <= MAX_ORDER_ID_ATTEMPTS; attempt++) {
+    try {
+      order = await prisma.$transaction(async (tx: PrismaTx) => {
+        // Decrement stock (product or variant, matching what was validated above).
+        // Use updateMany with a `stock >= qty` guard instead of a plain update —
+        // this makes the decrement atomic and conditional at the DB level, so two
+        // concurrent checkouts racing for the last unit can't both succeed and
+        // drive stock negative. If the guard fails (someone else beat us to it),
+        // count is 0 and we abort the whole transaction.
+        for (const item of resolvedItems) {
+          if (item.variantId) {
+            const result = await tx.productVariant.updateMany({
+              where: { id: item.variantId, stock: { gte: item.qty } },
+              data:  { stock: { decrement: item.qty } },
+            });
+            if (result.count === 0) {
+              throw new AppError(`Insufficient stock for ${item.product.name} (variant) — please review your cart`, 409);
+            }
+          } else {
+            const result = await tx.product.updateMany({
+              where: { id: item.productId, stock: { gte: item.qty } },
+              data:  { stock: { decrement: item.qty } },
+            });
+            if (result.count === 0) {
+              throw new AppError(`Insufficient stock for ${item.product.name} — please review your cart`, 409);
+            }
+          }
         }
-      } else {
-        const result = await tx.product.updateMany({
-          where: { id: item.productId, stock: { gte: item.qty } },
-          data:  { stock: { decrement: item.qty } },
-        });
-        if (result.count === 0) {
-          throw new AppError(`Insufficient stock for ${item.product.name} — please review your cart`, 409);
+
+        // Increment coupon usage
+        if (couponId) {
+          await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
         }
-      }
-    }
 
-    // Increment coupon usage
-    if (couponId) {
-      await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
+        // Create order
+        return tx.order.create({
+          data: {
+            orderId:       generateOrderId(),
+            userId,
+            addressId:     data.addressId,
+            status:        "pending",
+            paymentMethod: data.paymentMethod,
+            paymentStatus: "pending",
+            subtotal:      Math.round(subtotal),
+            gst:           Math.round(gst),
+            shipping,
+            discount,
+            total,
+            couponId,
+            deliveryDate:  data.deliveryDate ? new Date(data.deliveryDate) : null,
+            deliverySlot:  data.deliverySlot,
+            notes:         data.notes,
+            items:         { create: resolvedItems.map(i => ({
+              productId: i.productId,
+              variantId: i.variantId,
+              qty:       i.qty,
+              price:     i.price,       // server-resolved price, not client input
+              total:     i.price * i.qty,
+            }))},
+          },
+          include: { items: { include: { product: { select: { name: true, sku: true } } } }, address: true },
+        });
+      });
+      break; // success
+    } catch (err) {
+      if (!isOrderIdCollision(err) || attempt === MAX_ORDER_ID_ATTEMPTS) throw err;
+      // else: loop again — generateOrderId() will produce a fresh suffix
     }
-
-    // Create order
-    return tx.order.create({
-      data: {
-        orderId:       generateOrderId(),
-        userId,
-        addressId:     data.addressId,
-        status:        "pending",
-        paymentMethod: data.paymentMethod,
-        paymentStatus: "pending",
-        subtotal:      Math.round(subtotal),
-        gst:           Math.round(gst),
-        shipping,
-        discount,
-        total,
-        couponId,
-        deliveryDate:  data.deliveryDate ? new Date(data.deliveryDate) : null,
-        deliverySlot:  data.deliverySlot,
-        notes:         data.notes,
-        items:         { create: resolvedItems.map(i => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          qty:       i.qty,
-          price:     i.price,       // server-resolved price, not client input
-          total:     i.price * i.qty,
-        }))},
-      },
-      include: { items: { include: { product: { select: { name: true, sku: true } } } }, address: true },
-    });
-  });
+  }
 
   // 5. Notify admin via WebSocket
   emitToAdmins({
@@ -271,12 +317,8 @@ router.post("/:orderId/cancel", authenticate, asyncHandler(async (req: Request, 
   }
   if (order.status === "cancelled") throw new AppError("Order already cancelled", 400);
 
-  await prisma.$transaction(async (tx) => {
-    // Restock items
-    const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
-    for (const item of items) {
-      await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.qty } } });
-    }
+  await prisma.$transaction(async (tx: PrismaTx) => {
+    await restockOrderItems(tx, order.id);
     await tx.order.update({ where: { id: order.id }, data: { status: "cancelled" } });
     await tx.orderTimeline.create({
       data: { orderId: order.id, status: "cancelled", note: req.body.reason || "Cancelled by customer" },
@@ -350,7 +392,19 @@ router.patch("/:orderId/status",
     const order = await prisma.order.findFirst({ where: { orderId: req.params.orderId } });
     if (!order) throw new AppError("Order not found", 404);
 
-    const updated = await prisma.$transaction(async (tx) => {
+    // Restock only on the transition INTO cancelled/returned — never on an
+    // order that's already in one of those states, so calling this twice
+    // (or an admin cancelling an order the customer already cancelled)
+    // can't restock the same items more than once.
+    const RESTOCK_STATUSES = ["cancelled", "returned"];
+    const alreadyRestocked = RESTOCK_STATUSES.includes(order.status);
+    const shouldRestock    = RESTOCK_STATUSES.includes(status) && !alreadyRestocked;
+
+    const updated = await prisma.$transaction(async (tx: PrismaTx) => {
+      if (shouldRestock) {
+        await restockOrderItems(tx, order.id);
+      }
+
       const o = await tx.order.update({
         where: { id: order.id },
         data: {

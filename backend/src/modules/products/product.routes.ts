@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router, Request, Response } from "express";
 import { z }   from "zod";
+import { Prisma }       from "@prisma/client";
 import { prisma }       from "../../config/prisma";
 import { redis }        from "../../config/redis";
 import { AppError }     from "../../utils/AppError";
@@ -14,6 +15,8 @@ import { paginate }     from "../../utils/paginate";
 
 const router = Router();
 const CACHE_TTL = 300; // 5 min
+
+type PrismaTx = Prisma.TransactionClient;
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const ProductCreateSchema = z.object({
@@ -47,6 +50,12 @@ const ProductCreateSchema = z.object({
 });
 
 const ProductUpdateSchema = ProductCreateSchema.partial();
+
+const StockUpdateSchema = z.object({
+  quantity:  z.number().int(),
+  operation: z.enum(["set","add","subtract"]),
+  note:      z.string().optional(),
+});
 
 const ProductQuerySchema = z.object({
   page:       z.coerce.number().int().min(1).default(1),
@@ -230,39 +239,54 @@ router.delete("/:id",
  */
 router.patch("/:id/stock",
   authenticate, requireRole(["admin","super_admin","warehouse"]),
+  validate(StockUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { quantity, operation } = z.object({
-      quantity:  z.number().int(),
-      operation: z.enum(["set","add","subtract"]),
-    }).parse(req.body);
+    const { quantity, operation, note } = req.body as z.infer<typeof StockUpdateSchema>;
 
-    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
-    if (!product) throw new AppError("Product not found", 404);
+    if (operation === "set" && quantity < 0) {
+      throw new AppError("Stock cannot be negative", 400);
+    }
 
-    let newStock = product.stock;
-    if (operation === "set")      newStock  = quantity;
-    if (operation === "add")      newStock += quantity;
-    if (operation === "subtract") newStock -= quantity;
-    if (newStock < 0) throw new AppError("Stock cannot be negative", 400);
+    const newStock = await prisma.$transaction(async (tx: PrismaTx) => {
+      const exists = await tx.product.findUnique({ where: { id: req.params.id }, select: { id: true } });
+      if (!exists) throw new AppError("Product not found", 404);
 
-    const updated = await prisma.product.update({
-      where: { id: req.params.id },
-      data:  { stock: newStock },
+      let updated;
+      if (operation === "set") {
+        updated = await tx.product.update({ where: { id: req.params.id }, data: { stock: quantity } });
+      } else if (operation === "add") {
+        // Atomic DB-level increment — no read-then-write race.
+        updated = await tx.product.update({ where: { id: req.params.id }, data: { stock: { increment: quantity } } });
+      } else {
+        // subtract — atomic, conditional decrement: the `stock: { gte }`
+        // guard means two concurrent subtract requests racing for the same
+        // units can't both succeed and drive stock negative, unlike the
+        // previous read-current-value-then-write-new-value approach.
+        const result = await tx.product.updateMany({
+          where: { id: req.params.id, stock: { gte: quantity } },
+          data:  { stock: { decrement: quantity } },
+        });
+        if (result.count === 0) throw new AppError("Stock cannot be negative", 400);
+        updated = await tx.product.findUniqueOrThrow({ where: { id: req.params.id } });
+      }
+
+      // Log inventory movement (same transaction — never logged without
+      // the stock change actually having happened, or vice versa)
+      await tx.inventoryLog.create({
+        data: {
+          productId:  req.params.id,
+          operation,
+          quantity,
+          stockAfter: updated.stock,
+          note:       note || "",
+          adminId:    req.user!.userId,
+        },
+      });
+
+      return updated.stock;
     });
 
-    // Log inventory movement
-    await prisma.inventoryLog.create({
-      data: {
-        productId:  req.params.id,
-        operation,
-        quantity,
-        stockAfter: newStock,
-        note:       req.body.note || "",
-        adminId:    req.user!.userId,
-      },
-    });
-
-    res.json({ success: true, data: { stock: updated.stock } });
+    res.json({ success: true, data: { stock: newStock } });
   })
 );
 

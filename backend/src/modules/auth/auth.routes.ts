@@ -131,7 +131,7 @@ router.post("/login", validate(LoginSchema), asyncHandler(async (req: Request, r
 
   const failKey = `login_fails:${phone}`;
 
-  async function registerFailure(): Promise<never> {
+  async function registerFailure(message = "Invalid credentials"): Promise<never> {
     const fails = await redis.incr(failKey);
     if (fails === 1) await redis.expire(failKey, LOGIN_ATTEMPT_WINDOW_SECONDS);
 
@@ -143,14 +143,23 @@ router.post("/login", validate(LoginSchema), asyncHandler(async (req: Request, r
         429
       );
     }
-    throw new AppError("Invalid credentials", 401);
+    throw new AppError(message, 401);
   }
 
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) return registerFailure();
   if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
 
-  const isMatch = await bcrypt.compare(password, user.password!);
+  // Accounts auto-registered via /auth/otp/verify have no password set.
+  // bcrypt.compare(password, null) throws, so check explicitly rather than
+  // letting that surface as a generic 500 — still routed through
+  // registerFailure() so probing phone numbers this way is rate-limited and
+  // lockable exactly like any other failed login attempt.
+  if (!user.password) {
+    return registerFailure("This account uses OTP login. Please log in with an OTP instead of a password.");
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) return registerFailure();
 
   // Success — clear any failed-attempt tracking for this phone

@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
+import crypto  from "crypto";
 import { z }   from "zod";
 import { prisma }             from "../config/prisma";
 import { AppError }           from "../utils/AppError";
@@ -18,6 +19,13 @@ import { emitOrderUpdate, emitToAdmins } from "../websocket/ws.server";
 import { sendSMS }            from "./twilio";
 
 const router = Router();
+
+function safeCompareString(expected: string, actual: string): boolean {
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const actualBuf    = Buffer.from(actual,   "utf8");
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
 
 // ── Shipping rate check (public) ──────────────────────────────────────────────
 
@@ -237,12 +245,41 @@ router.post("/shipping/ndr",
 router.post("/shipping/webhook", asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
 
-  // Shiprocket webhooks don't have signature verification by default
-  // Add IP whitelist check for production
-  const allowedIPs = (process.env.SHIPROCKET_WEBHOOK_IPS || "").split(",");
-  const clientIP   = (req.headers["x-forwarded-for"] as string || req.ip || "").split(",")[0].trim();
+  // Shiprocket doesn't sign its webhook payloads, so this endpoint has to
+  // authenticate the caller itself. Two layers, both optional individually
+  // but at least one is REQUIRED — if neither is configured we fail closed
+  // (reject everything) rather than fail open (accept everything), which is
+  // what happened before when SHIPROCKET_WEBHOOK_IPS was left unset.
+  //
+  // 1. Shared secret (primary, recommended) — set SHIPROCKET_WEBHOOK_SECRET
+  //    and configure the Shiprocket webhook URL as
+  //    .../shipping/webhook?secret=<the same value>. Unlike an IP check,
+  //    this can't be bypassed by spoofing the X-Forwarded-For header, which
+  //    this server doesn't currently validate against a trusted proxy chain.
+  // 2. IP allowlist (optional, defense-in-depth) — SHIPROCKET_WEBHOOK_IPS,
+  //    comma-separated. Enforced in addition to the secret if both are set.
+  const configuredSecret = process.env.SHIPROCKET_WEBHOOK_SECRET || "";
+  const allowedIPs = (process.env.SHIPROCKET_WEBHOOK_IPS || "")
+    .split(",").map(ip => ip.trim()).filter(Boolean);
+  const clientIP = (req.headers["x-forwarded-for"] as string || req.ip || "").split(",")[0].trim();
 
-  if (allowedIPs.length > 0 && allowedIPs[0] !== "" && !allowedIPs.includes(clientIP)) {
+  if (!configuredSecret && allowedIPs.length === 0) {
+    logger.error(
+      "Shiprocket webhook rejected: neither SHIPROCKET_WEBHOOK_SECRET nor SHIPROCKET_WEBHOOK_IPS is configured, " +
+      "so this endpoint has no way to authenticate the caller. Set at least SHIPROCKET_WEBHOOK_SECRET to enable it."
+    );
+    return res.status(403).json({ error: "Webhook not configured" });
+  }
+
+  if (configuredSecret) {
+    const providedSecret = (req.query.secret as string) || (req.headers["x-webhook-secret"] as string) || "";
+    if (!providedSecret || !safeCompareString(configuredSecret, providedSecret)) {
+      logger.warn(`Shiprocket webhook rejected: invalid or missing secret (IP ${clientIP})`);
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+  }
+
+  if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
     logger.warn(`Shiprocket webhook from unauthorized IP: ${clientIP}`);
     return res.status(403).json({ error: "Unauthorized" });
   }
