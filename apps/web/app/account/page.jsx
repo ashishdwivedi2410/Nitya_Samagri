@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
  
 const C = {
   saffron: "#E8560A",
@@ -257,10 +258,10 @@ function OrdersView() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {o.status === "Delivered" && <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>🔄 Reorder</button>}
-                {o.canReview && <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>⭐ Write Review</button>}
+                {o.canReview && <Link href="/reviews" style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>⭐ Write Review</Link>}
                 {o.canReturn && <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.redBg}`, background: C.redBg, color: C.red, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>↩ Return</button>}
                 <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>📄 Invoice</button>
-                {o.status === "Shipped" && <button style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.blueBg}`, background: C.blueBg, color: C.blue, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>🚚 Track</button>}
+                {o.status === "Shipped" && <Link href="/delivery" style={{ padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.blueBg}`, background: C.blueBg, color: C.blue, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>🚚 Track</Link>}
               </div>
             </div>
  
@@ -571,6 +572,11 @@ export default function CustomerAccount() {
                 {item.label}
               </button>
             ))}
+          </div>
+          {/* Quick links to standalone pages */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <Link href="/notifications" style={{ flex: 1, textAlign: "center", padding: "10px", borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>🔔 Notifications</Link>
+            <Link href="/reviews" style={{ flex: 1, textAlign: "center", padding: "10px", borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>⭐ Reviews</Link>
           </div>
           <button style={{ width: "100%", marginTop: 12, padding: "12px", borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.white, color: C.red, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             Sign Out

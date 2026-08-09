@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import RequireAuth from "../_components/RequireAuth";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const C = {
@@ -515,6 +516,7 @@ export default function CouponsModule() {
   const [view, setView] = useState("admin");
 
   return (
+    <RequireAuth>
     <div style={{ minHeight:"100vh",display:"flex",fontFamily:"'Segoe UI','Helvetica Neue',sans-serif",background:C.bg }}>
 
       {/* Sidebar */}
@@ -575,5 +577,6 @@ export default function CouponsModule() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   );
 }

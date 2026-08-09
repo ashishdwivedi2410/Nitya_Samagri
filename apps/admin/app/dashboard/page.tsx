@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import RequireAuth from "../_components/RequireAuth";
+import { clearAdminSession } from "../_lib/adminAuth";
+import { useRouter } from "next/navigation";
 
 // ─── THEME: Obsidian + Saffron — dark professional with warm accent ───────────
 const C = {
@@ -706,8 +709,11 @@ const SIDEBAR_NAV = [
 
 export default function AdminDashboard() {
   const [view, setView] = useState("overview");
+  const router = useRouter();
+  const logOut = () => { clearAdminSession(); router.push("/login"); };
 
   return (
+    <RequireAuth>
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI','Helvetica Neue',sans-serif", color:C.text, display:"flex" }}>
 
       {/* Sidebar */}
@@ -741,13 +747,16 @@ export default function AdminDashboard() {
 
         {/* Admin profile */}
         <div style={{ padding:"14px 16px", borderTop:`1px solid ${C.border}` }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
             <div style={{ width:32, height:32, borderRadius:"50%", background:C.saffronBg, border:`2px solid ${C.saffron}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:C.saffron }}>SA</div>
             <div>
               <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Super Admin</div>
               <div style={{ fontSize:10, color:C.textLight }}>admin@nityasamagri.com</div>
             </div>
           </div>
+          <button onClick={logOut} style={{ width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:"transparent", color:C.textMid, fontWeight:600, fontSize:11, cursor:"pointer" }}>
+            ⏻ Log Out
+          </button>
         </div>
       </div>
 
@@ -782,5 +791,6 @@ export default function AdminDashboard() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
  
 const COLORS = {
   saffron: "#E8560A",
@@ -137,17 +138,17 @@ function Navbar({ cartCount }) {
               onMouseLeave={e => e.target.style.color = COLORS.textMid}
             >{item}</span>
           ))}
-          <div style={{ position: "relative", cursor: "pointer" }}>
+          <Link href="/cart" style={{ position: "relative", cursor: "pointer" }}>
             <span style={{ fontSize: 22 }}>🛒</span>
             {cartCount > 0 && (
               <div style={{ position: "absolute", top: -6, right: -6, background: COLORS.saffron, color: COLORS.white, borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>
                 {cartCount}
               </div>
             )}
-          </div>
-          <button style={{ padding: "8px 18px", borderRadius: 10, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          </Link>
+          <Link href="/login" style={{ padding: "8px 18px", borderRadius: 10, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer", textDecoration: "none", display: "inline-block" }}>
             Login
-          </button>
+          </Link>
         </div>
       </div>
     </nav>

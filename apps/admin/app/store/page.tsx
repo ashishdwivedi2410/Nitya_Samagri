@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import RequireAuth from "../_components/RequireAuth";
 
 // ─── THEME: Dark obsidian sidebar + warm ivory content ────────────────────────
 const S = {
@@ -758,6 +759,7 @@ export default function StoreManagement() {
   const groups = [...new Set(NAV.map(n=>n.group))];
 
   return (
+    <RequireAuth>
     <div style={{ minHeight:"100vh", display:"flex", fontFamily:"'Segoe UI','Helvetica Neue',sans-serif", background:S.bg }}>
 
       {/* ── Dark Sidebar ── */}
@@ -821,5 +823,6 @@ export default function StoreManagement() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   );
 }

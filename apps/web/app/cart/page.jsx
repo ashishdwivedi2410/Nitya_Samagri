@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
  
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const C = {
@@ -481,7 +482,7 @@ function SuccessScreen({ onReset }) {
           <div style={{ fontSize: 12, color: C.textLight }}>Confirmation sent to your registered mobile & email</div>
         </div>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <button style={{ padding: "11px 22px", borderRadius: 10, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Track Order</button>
+          <Link href="/delivery" style={{ padding: "11px 22px", borderRadius: 10, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "none" }}>Track Order</Link>
           <button onClick={onReset} style={{ padding: "11px 22px", borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Continue Shopping</button>
         </div>
       </div>
