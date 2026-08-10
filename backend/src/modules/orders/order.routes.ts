@@ -14,6 +14,7 @@ import { paginate }      from "../../utils/paginate";
 import { emitOrderUpdate, emitToAdmins } from "../../websocket/ws.server";
 import { sendSMS }       from "../../integrations/twilio";
 import { sendEmail }     from "../../integrations/sendgrid";
+import { logger }        from "../../utils/logger";
 
 const router = Router();
 
@@ -42,6 +43,22 @@ const UpdateStatusSchema = z.object({
   trackingNo:   z.string().optional(),
   courierName:  z.string().optional(),
   note:         z.string().optional(),
+});
+
+const MyOrdersQuerySchema = z.object({
+  page:   z.coerce.number().min(1).default(1),
+  limit:  z.coerce.number().min(1).max(50).default(10),
+  status: z.string().optional(),
+});
+
+const AdminOrdersQuerySchema = z.object({
+  page:      z.coerce.number().min(1).default(1),
+  limit:     z.coerce.number().min(1).max(100).default(20),
+  status:    z.string().optional(),
+  payment:   z.string().optional(),
+  q:         z.string().optional(),
+  dateFrom:  z.string().optional(),
+  dateTo:    z.string().optional(),
 });
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -75,6 +92,67 @@ function isOrderIdCollision(err: unknown): boolean {
   if (e?.code !== "P2002") return false;
   const target = e.meta?.target;
   return Array.isArray(target) ? target.includes("orderId") : String(target ?? "").includes("orderId");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+interface OrderConfirmationData {
+  orderId:  string;
+  subtotal: number;
+  gst:      number;
+  shipping: number;
+  discount: number;
+  total:    number;
+  items:    { qty: number; price: number; product: { name: string } }[];
+  address:  { name: string; line1: string; line2: string | null; city: string; state: string; pin: string } | null;
+}
+
+function buildOrderConfirmationEmail(order: OrderConfirmationData, customerName: string): string {
+  const rows = order.items.map(i => `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(i.product.name)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:center;">${i.qty}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">₹${(i.price * i.qty).toFixed(2)}</td>
+    </tr>`).join("");
+
+  const addr = order.address;
+  const addressBlock = addr
+    ? `${escapeHtml(addr.name)}<br>${escapeHtml(addr.line1)}${addr.line2 ? `, ${escapeHtml(addr.line2)}` : ""}<br>${escapeHtml(addr.city)}, ${escapeHtml(addr.state)} ${escapeHtml(addr.pin)}`
+    : "";
+
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;">
+    <h2 style="color:#b45309;margin-bottom:4px;">Thank you for your order, ${escapeHtml(customerName)}!</h2>
+    <p style="color:#555;">Your order <strong>${order.orderId}</strong> has been placed and is being processed.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px 0;border-bottom:2px solid #b45309;">Item</th>
+          <th style="text-align:center;padding:8px 0;border-bottom:2px solid #b45309;">Qty</th>
+          <th style="text-align:right;padding:8px 0;border-bottom:2px solid #b45309;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <table style="width:100%;margin-top:8px;font-size:14px;">
+      <tr><td>Subtotal</td><td style="text-align:right;">₹${order.subtotal.toFixed(2)}</td></tr>
+      <tr><td>GST</td><td style="text-align:right;">₹${order.gst.toFixed(2)}</td></tr>
+      <tr><td>Shipping</td><td style="text-align:right;">₹${order.shipping.toFixed(2)}</td></tr>
+      ${order.discount ? `<tr><td>Discount</td><td style="text-align:right;">-₹${order.discount.toFixed(2)}</td></tr>` : ""}
+      <tr><td style="font-weight:bold;padding-top:8px;">Total</td><td style="text-align:right;font-weight:bold;padding-top:8px;">₹${order.total.toFixed(2)}</td></tr>
+    </table>
+    ${addressBlock ? `<p style="margin-top:16px;font-size:14px;"><strong>Shipping to</strong><br>${addressBlock}</p>` : ""}
+    <p style="margin-top:24px;font-size:14px;color:#555;">
+      You can track your order anytime at <a href="https://nityasamagri.com/orders" style="color:#b45309;">nityasamagri.com/orders</a>.
+    </p>
+  </div>`;
 }
 
 // Restock whatever an order's line items actually decremented at checkout —
@@ -167,7 +245,10 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
   // as normal. Retrying the whole transaction is safe here: a collision
   // means the create() never committed, so nothing has actually decremented
   // yet on that attempt.
-  let order;
+  let order: Awaited<ReturnType<typeof prisma.order.create>> & {
+    items:   { qty: number; price: number; product: { name: string; sku: string } }[];
+    address: { name: string; line1: string; line2: string | null; city: string; state: string; pin: string } | null;
+  } | undefined;
   for (let attempt = 1; attempt <= MAX_ORDER_ID_ATTEMPTS; attempt++) {
     try {
       order = await prisma.$transaction(async (tx: PrismaTx) => {
@@ -244,10 +325,18 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
     payload: { orderId: order.orderId, amount: order.total, customer: userId, timestamp: Date.now() },
   });
 
-  // 6. Send confirmation SMS (non-blocking)
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true } });
+  // 6. Send confirmation SMS + email (both non-blocking — a notification
+  // failure should never fail order placement, which has already succeeded)
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true, email: true } });
   if (user?.phone) {
     sendSMS(user.phone, `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.com/orders`).catch(() => {});
+  }
+  if (user?.email) {
+    sendEmail({
+      to:      user.email,
+      subject: `Order Confirmed — ${order.orderId}`,
+      html:    buildOrderConfirmationEmail(order, user.name),
+    }).catch(err => logger.error(`Order confirmation email failed for ${order.orderId}:`, err.message));
   }
 
   res.status(201).json({ success: true, data: { order } });
@@ -257,12 +346,8 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
  * GET /api/v1/orders
  * Get current user's orders
  */
-router.get("/", authenticate, asyncHandler(async (req: Request, res: Response) => {
-  const q = z.object({
-    page:   z.coerce.number().min(1).default(1),
-    limit:  z.coerce.number().min(1).max(50).default(10),
-    status: z.string().optional(),
-  }).parse(req.query);
+router.get("/", authenticate, validate(MyOrdersQuerySchema, "query"), asyncHandler(async (req: Request, res: Response) => {
+  const q = req.query as unknown as z.infer<typeof MyOrdersQuerySchema>;
 
   const where: Record<string, unknown> = { userId: req.user!.userId };
   if (q.status) where.status = q.status;
@@ -337,16 +422,9 @@ router.post("/:orderId/cancel", authenticate, asyncHandler(async (req: Request, 
  */
 router.get("/admin/all",
   authenticate, requireRole(["admin","super_admin","order_manager"]),
+  validate(AdminOrdersQuerySchema, "query"),
   asyncHandler(async (req: Request, res: Response) => {
-    const q = z.object({
-      page:      z.coerce.number().min(1).default(1),
-      limit:     z.coerce.number().min(1).max(100).default(20),
-      status:    z.string().optional(),
-      payment:   z.string().optional(),
-      q:         z.string().optional(),
-      dateFrom:  z.string().optional(),
-      dateTo:    z.string().optional(),
-    }).parse(req.query);
+    const q = req.query as unknown as z.infer<typeof AdminOrdersQuerySchema>;
 
     const where: Record<string, unknown> = {};
     if (q.status)  where.status        = q.status;

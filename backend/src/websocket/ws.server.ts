@@ -1,6 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { redis } from "../config/redis";
 import { logger } from "../utils/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,6 +41,93 @@ const adminConnections = new Set<AuthenticatedSocket>();
 const AUTH_TIMEOUT_MS = 10_000;
 
 let wss: WebSocketServer;
+
+// ── Cross-instance delivery (Redis pub/sub) ─────────────────────────────────
+// The connection registries above (userConnections, adminConnections, wss)
+// only know about sockets open on THIS process. Behind a load balancer with
+// more than one backend replica, a customer connected to instance A never
+// sees an event emitted from instance B unless something relays it across
+// processes — so every emit is published on a shared Redis channel, and
+// every instance (including the one that published it) subscribes to that
+// channel and delivers to whichever local sockets match the target.
+//
+// Local delivery still happens synchronously and unconditionally at publish
+// time, before the Redis round-trip — a Redis outage degrades this back to
+// single-instance-only delivery instead of losing events on the instance
+// that actually handled the request. INSTANCE_ID lets the subscriber ignore
+// the echo of an instance's own publish, so that instance doesn't deliver
+// the same message to its local sockets twice.
+const WS_CHANNEL   = "ws:broadcast";
+const INSTANCE_ID  = crypto.randomUUID();
+
+interface WsBroadcast {
+  target:  "user" | "admins" | "all";
+  userId?: string; // present when target === "user"
+  message: WsMessage;
+  origin:  string;
+}
+
+function deliverLocally(broadcast: Omit<WsBroadcast, "origin">) {
+  const payload = JSON.stringify(broadcast.message);
+
+  if (broadcast.target === "user" && broadcast.userId) {
+    const conns = userConnections.get(broadcast.userId);
+    conns?.forEach(socket => {
+      if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+    });
+  } else if (broadcast.target === "admins") {
+    adminConnections.forEach(socket => {
+      if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+    });
+  } else if (broadcast.target === "all") {
+    wss?.clients.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    });
+  }
+}
+
+function publish(broadcast: Omit<WsBroadcast, "origin">) {
+  // Always deliver locally first — this instance's own connections must not
+  // depend on Redis being reachable.
+  deliverLocally(broadcast);
+
+  redis.publish(WS_CHANNEL, JSON.stringify({ ...broadcast, origin: INSTANCE_ID })).catch((err: Error) => {
+    logger.error("Failed to publish WS event to Redis — other instances won't see it:", err.message);
+  });
+}
+
+// Subscribing requires a dedicated connection: once an ioredis connection
+// issues SUBSCRIBE it can no longer run ordinary commands, so it can't share
+// the connection used for PUBLISH/caching/etc.
+const subscriber = redis.duplicate();
+
+subscriber.on("error", (err: Error) => {
+  logger.error("WS Redis subscriber error:", err.message);
+});
+
+subscriber.subscribe(WS_CHANNEL, (err) => {
+  if (err) logger.error("Failed to subscribe to WS broadcast channel:", err.message);
+  else      logger.info(`Subscribed to Redis channel "${WS_CHANNEL}" for cross-instance WS delivery`);
+});
+
+subscriber.on("message", (channel: string, raw: string) => {
+  if (channel !== WS_CHANNEL) return;
+
+  let broadcast: WsBroadcast;
+  try {
+    broadcast = JSON.parse(raw);
+  } catch {
+    logger.warn("Received malformed WS broadcast message from Redis, dropping");
+    return;
+  }
+
+  if (broadcast.origin === INSTANCE_ID) return; // already delivered at publish time
+  deliverLocally(broadcast);
+});
+
+process.on("beforeExit", async () => {
+  await subscriber.quit();
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 export function initWebSocket(server: http.Server) {
@@ -159,34 +248,19 @@ function handleClientMessage(socket: AuthenticatedSocket, msg: unknown) {
 
 // ── Emit helpers (called from service layer) ──────────────────────────────────
 
-/** Send an event to a specific user (all their tabs) */
+/** Send an event to a specific user (all their tabs, on any instance) */
 export function emitToUser(userId: string, message: WsMessage) {
-  const conns = userConnections.get(userId);
-  if (!conns) return;
-  const payload = JSON.stringify(message);
-  conns.forEach(socket => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(payload);
-    }
-  });
+  publish({ target: "user", userId, message });
 }
 
-/** Broadcast an event to all connected admins */
+/** Broadcast an event to all connected admins (on any instance) */
 export function emitToAdmins(message: WsMessage) {
-  const payload = JSON.stringify(message);
-  adminConnections.forEach(socket => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(payload);
-    }
-  });
+  publish({ target: "admins", message });
 }
 
 /** Broadcast to everyone (e.g. flash sales, system alerts) */
 export function broadcastAll(message: WsMessage) {
-  const payload = JSON.stringify(message);
-  wss?.clients.forEach(ws => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(payload);
-  });
+  publish({ target: "all", message });
 }
 
 /** Convenience: notify user + admins on order status change */

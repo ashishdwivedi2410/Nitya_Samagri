@@ -3,8 +3,6 @@
 // Razorpay order creation + webhook verification + refunds
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router, Request, Response } from "express";
-import Razorpay from "razorpay";
-import crypto   from "crypto";
 import { z }    from "zod";
 import { Prisma }        from "@prisma/client";
 import { prisma }        from "../../config/prisma";
@@ -15,25 +13,9 @@ import { requireRole }   from "../../middlewares/rbac.middleware";
 import { validate }      from "../../middlewares/validate.middleware";
 import { emitToUser, emitToAdmins } from "../../websocket/ws.server";
 import { sendSMS }       from "../../integrations/twilio";
+import { razorpayService } from "../../integrations/razorpay.service";
 
 const router = Router();
-
-// ── Timing-safe signature comparison ────────────────────────────────────────
-// crypto.timingSafeEqual requires equal-length buffers, so we guard the
-// length check first (a length mismatch is not itself sensitive information —
-// Razorpay signatures are always fixed-length hex digests).
-function safeCompare(expectedHex: string, actualHex: string): boolean {
-  const expectedBuf = Buffer.from(expectedHex, "hex");
-  const actualBuf    = Buffer.from(actualHex,   "hex");
-  if (expectedBuf.length !== actualBuf.length) return false;
-  return crypto.timingSafeEqual(expectedBuf, actualBuf);
-}
-
-// ── Razorpay client ───────────────────────────────────────────────────────────
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const CreatePaymentOrderSchema = z.object({
@@ -74,13 +56,13 @@ router.post("/create-order",
     if (order.paymentStatus === "paid") throw new AppError("Order already paid", 400);
 
     // Create Razorpay order
-    const rzpOrder = await razorpay.orders.create({
-      amount:   order.total * 100, // paise
-      currency: "INR",
-      receipt:  order.orderId,
-      notes:    {
-        nityasamagri_order_id: order.orderId,
-        customer_id:        order.userId,
+    const rzpOrder = await razorpayService.createOrder({
+      amount:  order.total, // rupees — the service converts to paise internally
+      receipt: order.orderId,
+      notes:   {
+        orderId:    order.orderId,
+        customerId: order.userId,
+        type:       "product",
       },
     });
 
@@ -123,13 +105,7 @@ router.post("/verify",
     //    is a genuine pair Razorpay signed for SOME payment. It says nothing
     //    about which of our internal orders should be marked paid — that
     //    binding is established explicitly in steps 3-5 below.
-    const body      = `${razorpayOrderId}|${razorpayPaymentId}`;
-    const expected  = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-      .update(body)
-      .digest("hex");
-
-    if (!safeCompare(expected, razorpaySignature)) {
+    if (!razorpayService.verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
       throw new AppError("Payment verification failed. Invalid signature.", 400);
     }
 
@@ -156,7 +132,7 @@ router.post("/verify",
 
     // 5. Fetch payment details from Razorpay and cross-check them against
     //    the order server-side — never trust amount/status from the client.
-    const payment = await razorpay.payments.fetch(razorpayPaymentId);
+    const payment = await razorpayService.fetchPayment(razorpayPaymentId);
 
     if (payment.order_id !== razorpayOrderId) {
       throw new AppError("Payment does not match this order.", 400);
@@ -229,21 +205,13 @@ router.post("/verify",
 router.post("/webhook", asyncHandler(async (req: Request, res: Response) => {
   const signature = req.headers["x-razorpay-signature"] as string;
   const body      = req.body as Buffer;
-  const secret    = process.env.RAZORPAY_WEBHOOK_SECRET!;
 
   // Verify webhook signature
-  if (!signature) {
-    throw new AppError("Invalid webhook signature", 400);
-  }
-  const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  if (!safeCompare(expected, signature)) {
+  if (!signature || !razorpayService.verifyWebhookSignature(body, signature)) {
     throw new AppError("Invalid webhook signature", 400);
   }
 
-  const event = JSON.parse(body.toString()) as {
-    event: string;
-    payload: { payment?: { entity: Record<string, unknown> }; refund?: { entity: Record<string, unknown> } };
-  };
+  const event = razorpayService.parseWebhookEvent(body);
 
   switch (event.event) {
 
@@ -335,9 +303,11 @@ router.post("/refund",
       );
     }
 
-    const refund = await razorpay.payments.refund(order.razorpayPaymentId, {
-      amount: Math.round(thisRefund * 100),
-      notes:  { reason: reason || "Refund initiated by admin", orderId },
+    const refund = await razorpayService.initiateRefund({
+      paymentId:   order.razorpayPaymentId,
+      amount:      thisRefund, // rupees — the service converts to paise internally
+      reason:      reason || "Refund initiated by admin",
+      referenceId: orderId,
     });
 
     // Persist with an atomic DB-level increment — never a plain overwrite —

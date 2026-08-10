@@ -36,10 +36,11 @@ export interface VerifyPaymentParams {
 }
 
 export interface RefundParams {
-  paymentId: string;
-  amount?:   number;   // partial refund in rupees; omit for full refund
-  reason?:   string;
-  notes?:    Record<string, string>;
+  paymentId:    string;
+  amount?:      number;   // partial refund in rupees; omit for full refund
+  reason?:      string;
+  referenceId?: string;   // shown in the refund's Razorpay notes; falls back to paymentId
+  notes?:       Record<string, string>;
 }
 
 export interface PayoutParams {

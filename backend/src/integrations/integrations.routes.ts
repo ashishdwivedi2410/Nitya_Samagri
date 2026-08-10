@@ -27,19 +27,38 @@ function safeCompareString(expected: string, actual: string): boolean {
   return crypto.timingSafeEqual(expectedBuf, actualBuf);
 }
 
+// ── Schemas ───────────────────────────────────────────────────────────────────
+const ShippingRatesQuerySchema = z.object({
+  pincode:    z.string().regex(/^\d{6}$/, "Invalid pincode"),
+  weight:     z.coerce.number().positive().default(0.5),
+  orderValue: z.coerce.number().min(0).default(0),
+  cod:        z.enum(["true","false"]).default("false").transform(v => v === "true"),
+});
+
+const ShippingCreateSchema = z.object({
+  orderId:   z.string(),
+  courierId: z.number().optional(),
+});
+
+const ShippingPickupSchema = z.object({
+  shipmentIds: z.array(z.number()).min(1),
+});
+
+const ShippingNdrSchema = z.object({
+  awb:           z.string(),
+  action:        z.enum(["re-attempt","return"]),
+  reattemptDate: z.string().optional(),
+  remarks:       z.string().optional(),
+});
+
 // ── Shipping rate check (public) ──────────────────────────────────────────────
 
 /**
  * GET /api/v1/integrations/shipping/rates?pincode=110070&weight=0.5&orderValue=599
  * Returns available couriers and rates for a delivery pincode
  */
-router.get("/shipping/rates", asyncHandler(async (req: Request, res: Response) => {
-  const q = z.object({
-    pincode:    z.string().regex(/^\d{6}$/, "Invalid pincode"),
-    weight:     z.coerce.number().positive().default(0.5),
-    orderValue: z.coerce.number().min(0).default(0),
-    cod:        z.coerce.boolean().default(false),
-  }).parse(req.query);
+router.get("/shipping/rates", validate(ShippingRatesQuerySchema, "query"), asyncHandler(async (req: Request, res: Response) => {
+  const q = req.query as unknown as z.infer<typeof ShippingRatesQuerySchema>;
 
   const pickupPincode = process.env.PICKUP_PINCODE || "160055"; // Mohali warehouse
 
@@ -93,11 +112,9 @@ router.get("/shipping/track/:awb", asyncHandler(async (req: Request, res: Respon
  */
 router.post("/shipping/create",
   authenticate, requireRole(["admin","super_admin","order_manager"]),
+  validate(ShippingCreateSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { orderId, courierId } = z.object({
-      orderId:   z.string(),
-      courierId: z.number().optional(),
-    }).parse(req.body);
+    const { orderId, courierId } = req.body as z.infer<typeof ShippingCreateSchema>;
 
     const order = await prisma.order.findFirst({
       where:   { orderId },
@@ -188,10 +205,9 @@ router.post("/shipping/create",
  */
 router.post("/shipping/pickup",
   authenticate, requireRole(["admin","super_admin","order_manager","warehouse"]),
+  validate(ShippingPickupSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { shipmentIds } = z.object({
-      shipmentIds: z.array(z.number()).min(1),
-    }).parse(req.body);
+    const { shipmentIds } = req.body as z.infer<typeof ShippingPickupSchema>;
 
     const result = await shiprocketService.schedulePickup(shipmentIds);
 
@@ -209,13 +225,9 @@ router.post("/shipping/pickup",
  */
 router.post("/shipping/ndr",
   authenticate, requireRole(["admin","super_admin","order_manager"]),
+  validate(ShippingNdrSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { awb, action, reattemptDate, remarks } = z.object({
-      awb:           z.string(),
-      action:        z.enum(["re-attempt","return"]),
-      reattemptDate: z.string().optional(),
-      remarks:       z.string().optional(),
-    }).parse(req.body);
+    const { awb, action, reattemptDate, remarks } = req.body as z.infer<typeof ShippingNdrSchema>;
 
     await shiprocketService.handleNDR({ awb, action, reattemptDate, remarks });
 

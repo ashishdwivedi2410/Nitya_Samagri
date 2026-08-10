@@ -5,7 +5,7 @@ import { Router, Request, Response } from "express";
 import { z }   from "zod";
 import { Prisma }       from "@prisma/client";
 import { prisma }       from "../../config/prisma";
-import { redis }        from "../../config/redis";
+import { redis, cacheDelPattern } from "../../config/redis";
 import { AppError }     from "../../utils/AppError";
 import { asyncHandler } from "../../middlewares/async.middleware";
 import { authenticate } from "../../middlewares/auth.middleware";
@@ -185,7 +185,7 @@ router.post("/",
     });
 
     // Invalidate product list cache
-    await redis.keys("products:list:*").then(keys => keys.length && redis.del(...keys));
+    await cacheDelPattern("products:list:*");
 
     res.status(201).json({ success: true, data: { product } });
   })
@@ -212,7 +212,7 @@ router.patch("/:id",
 
     // Bust cache
     await redis.del(`products:slug:${product.slug}`);
-    await redis.keys("products:list:*").then(keys => keys.length && redis.del(...keys));
+    await cacheDelPattern("products:list:*");
 
     res.json({ success: true, data: { product: updated } });
   })

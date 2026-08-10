@@ -55,11 +55,31 @@ export async function cacheDel(key: string): Promise<void> {
   await redis.del(key);
 }
 
-/** Delete all keys matching a pattern (e.g. "products:list:*") */
+/**
+ * Delete all keys matching a pattern (e.g. "products:list:*").
+ *
+ * Uses SCAN rather than KEYS: KEYS is O(N) over the *entire* keyspace and
+ * blocks the single-threaded Redis event loop for the whole scan — fine on
+ * a handful of keys, a real problem once the cache has meaningful volume.
+ * SCAN walks the keyspace incrementally via a cursor, touching a small
+ * bounded number of keys per call, so it never blocks other clients.
+ */
 export async function cacheDelPattern(pattern: string): Promise<void> {
-  const keys = await redis.keys(pattern);
-  if (keys.length > 0) {
-    await redis.del(...keys);
+  const matched: string[] = [];
+  let cursor = "0";
+
+  do {
+    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+    cursor = nextCursor;
+    matched.push(...keys);
+  } while (cursor !== "0");
+
+  if (matched.length === 0) return;
+
+  // Delete in batches rather than one DEL with a potentially huge arg list.
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < matched.length; i += BATCH_SIZE) {
+    await redis.del(...matched.slice(i, i + BATCH_SIZE));
   }
 }
 
