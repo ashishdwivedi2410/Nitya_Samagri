@@ -31,7 +31,7 @@ jobs:
       - name: Build and push Admin
         uses: docker/build-push-action@v5
         with:
-          context:  ./apps/admin
+          context:  .
           file:     ./apps/admin/Dockerfile
           target:   production
           push:     true

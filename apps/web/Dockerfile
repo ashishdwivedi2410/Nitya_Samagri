@@ -11,13 +11,16 @@ RUN apk add --no-cache libc6-compat
 # ── Stage 2: Install dependencies ────────────────────────────────────────────
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+COPY apps/web/package.json ./apps/web/package.json
+RUN npm ci --workspace=apps/web --include-workspace-root --frozen-lockfile
 
 # ── Stage 3: Development ──────────────────────────────────────────────────────
 FROM base AS development
 ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
+WORKDIR /app/apps/web
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
@@ -28,7 +31,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
+WORKDIR /app/apps/web
 
 # Accept build args for public env vars
 ARG NEXT_PUBLIC_API_URL
@@ -42,6 +47,7 @@ ENV NEXT_PUBLIC_RAZORPAY_KEY=$NEXT_PUBLIC_RAZORPAY_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
 RUN npm run build
+
 
 # ── Stage 5: Production runner ────────────────────────────────────────────────
 FROM node:20-alpine AS production
@@ -60,9 +66,11 @@ RUN addgroup --system --gid 1001 nodejs \
 
 # Copy Next.js standalone output
 # Requires: output: "standalone" in next.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public          ./public
+# With standalone output in a workspace, Next nests the app under
+# .next/standalone/apps/web — flatten it back to /app.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static    ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public          ./apps/web/public
 
 USER nextjs
 EXPOSE 3000
@@ -70,4 +78,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]
