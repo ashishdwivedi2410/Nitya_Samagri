@@ -18,7 +18,6 @@ RUN npm ci --workspace=apps/web --include-workspace-root --frozen-lockfile
 FROM base AS development
 ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 WORKDIR /app/apps/web
 EXPOSE 3000
@@ -27,11 +26,9 @@ CMD ["npm", "run", "dev"]
 # ── Stage 4: Build for production ────────────────────────────────────────────
 FROM base AS builder
 ENV NODE_ENV=production
-# Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 WORKDIR /app/apps/web
 
