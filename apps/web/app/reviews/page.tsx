@@ -27,7 +27,7 @@ const INIT_SUBMITTED = [
   { id: "r3", name: "Navratri Puja Kit",       icon: "🎁", rating: 5, text: "Everything was exactly as described — pure and well packaged. Highly recommend.", date: "3 May 2026",  helpful: 21 },
 ];
 
-function Stars({ value, size = 14, onChange }) {
+function Stars({ value, size = 14, onChange }: { value: number; size?: number; onChange?: (n: number) => void }) {
   return (
     <div style={{ display: "flex", gap: 2 }}>
       {[1, 2, 3, 4, 5].map(n => (
@@ -41,7 +41,17 @@ function Stars({ value, size = 14, onChange }) {
   );
 }
 
-function WriteReviewForm({ item, onSubmit, onCancel }) {
+type PendingItem = { id: string; name: string; icon: string; orderId: string; deliveredOn: string };
+
+function WriteReviewForm({
+  item,
+  onSubmit,
+  onCancel,
+}: {
+  item: PendingItem;
+  onSubmit: (vals: { rating: number; text: string }) => void;
+  onCancel: () => void;
+}) {
   const [rating, setRating] = useState(0);
   const [text, setText] = useState("");
 
@@ -72,9 +82,9 @@ export default function ReviewsPage() {
   const [tab, setTab] = useState("pending");
   const [pending, setPending] = useState(PENDING);
   const [submitted, setSubmitted] = useState(INIT_SUBMITTED);
-  const [writingId, setWritingId] = useState(null);
+  const [writingId, setWritingId] = useState<string | null>(null);
 
-  const handleSubmit = (item, { rating, text }) => {
+  const handleSubmit = (item: PendingItem, { rating, text }: { rating: number; text: string }) => {
     setSubmitted(prev => [{ id: `r-${Date.now()}`, name: item.name, icon: item.icon, rating, text, date: "Just now", helpful: 0 }, ...prev]);
     setPending(prev => prev.filter(p => p.id !== item.id));
     setWritingId(null);

@@ -39,7 +39,7 @@ const STAGES = [
   { key: "delivered",         label: "Delivered",        icon: "🏠", time: "Expected 9 Aug" },
 ];
 
-function currentIndex(status) {
+function currentIndex(status: string) {
   return STAGES.findIndex(s => s.key === status);
 }
 

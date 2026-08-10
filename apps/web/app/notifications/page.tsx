@@ -48,7 +48,7 @@ export default function NotificationsPage() {
   const unreadCount = notifs.filter(n => !n.read).length;
 
   const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-  const toggleRead = (id) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: !n.read } : n));
+  const toggleRead = (id: string) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: !n.read } : n));
   const clearAll = () => setNotifs([]);
 
   return (
@@ -110,7 +110,7 @@ export default function NotificationsPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visible.map(n => {
-              const tc = typeColor[n.type];
+              const tc = typeColor[n.type as keyof typeof typeColor];
               return (
                 <div key={n.id} onClick={() => toggleRead(n.id)} style={{
                   background: n.read ? C.white : C.saffronBg,

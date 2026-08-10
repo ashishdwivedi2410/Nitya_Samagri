@@ -107,9 +107,8 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "date-fns"],
   },
 
-  // ── TypeScript + ESLint ───────────────────────────────────────────────────
+  // ── TypeScript ───────────────────────────────────────────────────
   typescript:    { ignoreBuildErrors: false },
-  eslint:        { ignoreDuringBuilds: false },
   poweredByHeader: false,
 
   // ── Webpack customization ─────────────────────────────────────────────────

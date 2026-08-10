@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties, ReactNode, KeyboardEvent, FormEvent } from "react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,7 +19,7 @@ const C = {
   red: "#C0392B", redBg: "#FFF0EE",
 };
 
-const inputStyle = {
+const inputStyle: CSSProperties = {
   width: "100%", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${C.border}`,
   fontSize: 14, color: C.text, background: C.cream, outline: "none", boxSizing: "border-box",
 };
@@ -28,7 +29,7 @@ const primaryBtn = {
   border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer",
 };
 
-function Field({ label, children }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 6 }}>{label}</label>
@@ -37,24 +38,24 @@ function Field({ label, children }) {
   );
 }
 
-function OtpBoxes({ value, onChange }) {
-  const refs = useRef([]);
-  const update = (i, val) => {
+function OtpBoxes({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const update = (i: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
     const next = value.split("");
     next[i] = val;
     onChange(next.join("").slice(0, 6));
-    if (val && refs.current[i + 1]) refs.current[i + 1].focus();
+    if (val && refs.current[i + 1]) refs.current[i + 1]?.focus();
   };
-  const onKeyDown = (i, e) => {
-    if (e.key === "Backspace" && !value[i] && refs.current[i - 1]) refs.current[i - 1].focus();
+  const onKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !value[i] && refs.current[i - 1]) refs.current[i - 1]?.focus();
   };
   return (
     <div style={{ display: "flex", gap: 8 }}>
       {[0, 1, 2, 3, 4, 5].map(i => (
         <input
           key={i}
-          ref={el => (refs.current[i] = el)}
+          ref={el => { refs.current[i] = el; }}
           value={value[i] || ""}
           onChange={e => update(i, e.target.value)}
           onKeyDown={e => onKeyDown(i, e)}
@@ -97,7 +98,7 @@ export default function LoginPage() {
     setResendIn(30);
   };
 
-  const submit = (e) => {
+  const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
