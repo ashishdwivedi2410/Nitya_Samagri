@@ -42,7 +42,7 @@ ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_RAZORPAY_KEY=$NEXT_PUBLIC_RAZORPAY_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
-RUN npm run build
+RUN npx turbo run build --filter=./apps/admin
 
 # ── Stage 5: Production runner ────────────────────────────────────────────────
 FROM node:20-alpine AS production
