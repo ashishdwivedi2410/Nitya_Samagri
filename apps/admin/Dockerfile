@@ -11,7 +11,8 @@ RUN apk add --no-cache libc6-compat
 # ── Stage 2: Install dependencies ────────────────────────────────────────────
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+COPY apps/admin/package.json ./apps/admin/package.json
+RUN npm ci --workspace=apps/admin --include-workspace-root --frozen-lockfile
 
 # ── Stage 3: Development ──────────────────────────────────────────────────────
 FROM base AS development

@@ -16,7 +16,7 @@
     "NEXT_PUBLIC_WS_URL",
     "NEXT_PUBLIC_RAZORPAY_KEY"
   ],
-  "pipeline": {
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
