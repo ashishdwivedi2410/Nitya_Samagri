@@ -107,18 +107,19 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "date-fns"],
   },
 
-  // ── TypeScript ───────────────────────────────────────────────────
+  // ── TypeScript ────────────────────────────────────────────────────────────
   typescript:    { ignoreBuildErrors: false },
   poweredByHeader: false,
 
-  // ── Webpack customization ─────────────────────────────────────────────────
-  webpack(config, { isServer }) {
-    // SVG as React component
-    config.module.rules.push({
-      test:    /\.svg$/,
-      use:     ["@svgr/webpack"],
-    });
-    return config;
+  // ── Turbopack customization (replaces old webpack() config) ────────────────
+  // SVG as React component via @svgr/webpack, migrated for Turbopack (Next 16 default bundler)
+  turbopack: {
+    rules: {
+      "*.svg": {
+        loaders: ["@svgr/webpack"],
+        as: "*.js",
+      },
+    },
   },
 };
 
