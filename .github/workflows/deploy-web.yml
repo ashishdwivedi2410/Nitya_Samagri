@@ -37,8 +37,8 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
         env:
-          NEXT_PUBLIC_API_URL:      https://api.nityasamagri.com/api/v1
-          NEXT_PUBLIC_WS_URL:       wss://api.nityasamagri.com/ws
+          NEXT_PUBLIC_API_URL:      https://api.livetestingserver.com/api/v1
+          NEXT_PUBLIC_WS_URL:       wss://api.livetestingserver.com/ws
           NEXT_PUBLIC_RAZORPAY_KEY: ${{ secrets.RAZORPAY_KEY_ID }}
 
   # ── Build & Push Docker Image ─────────────────────────────────────────────────
@@ -71,10 +71,10 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
+            NEXT_PUBLIC_API_URL=https://api.livetestingserver.com/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.livetestingserver.com/ws
             NEXT_PUBLIC_RAZORPAY_KEY=${{ secrets.RAZORPAY_KEY_ID }}
-            NEXT_PUBLIC_APP_URL=https://nityasamagri.com
+            NEXT_PUBLIC_APP_URL=https://livetestingserver.com
 
   # ── Deploy to Lightsail ───────────────────────────────────────────────────────
   deploy:
@@ -84,7 +84,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
-      url: https://nityasamagri.com
+      url: https://livetestingserver.com
 
     steps:
       - uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
                            -f docker-compose.prod.yml \
                            up -d --no-deps web
             sleep 10
-            curl -sf https://nityasamagri.com || exit 1
+            curl -sf https://livetestingserver.com || exit 1
             docker image prune -f
             echo "✅ Customer web deployed!"
 
