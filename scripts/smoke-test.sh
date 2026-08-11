@@ -22,9 +22,9 @@ set -uo pipefail
 RETRIES="${SMOKE_TEST_RETRIES:-5}"
 DELAY="${SMOKE_TEST_RETRY_DELAY:-5}"
 
-API_HEALTH_URL="${API_HEALTH_URL:-https://api.nityasamagri.com/health}"
-WEB_URL="${WEB_URL:-https://nityasamagri.com}"
-ADMIN_URL="${ADMIN_URL:-https://admin.nityasamagri.com}"
+API_HEALTH_URL="${API_HEALTH_URL:-https://api.livetestingserver.com/health}"
+WEB_URL="${WEB_URL:-https://livetestingserver.com}"
+ADMIN_URL="${ADMIN_URL:-https://admin.livetestingserver.com}"
 
 FAILED=0
 
