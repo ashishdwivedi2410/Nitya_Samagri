@@ -24,6 +24,13 @@ export const mockRedisInstance = {
   expire: jest.fn().mockResolvedValue(1),
   ttl:    jest.fn().mockResolvedValue(-1),
   publish: jest.fn().mockResolvedValue(0),
+  // Used only on the duplicated subscriber connection (see `duplicate`
+  // below), but it's simplest to keep every ioredis method the app calls
+  // on one shared mock rather than a second, subscriber-only mock shape.
+  subscribe: jest.fn((_channel: string, cb?: (err: Error | null) => void) => {
+    cb?.(null);
+    return Promise.resolve(1);
+  }),
   quit:   jest.fn().mockResolvedValue("OK"),
   on:     jest.fn().mockReturnThis(),
   // redis.duplicate() (used by the WebSocket server for a pub/sub
