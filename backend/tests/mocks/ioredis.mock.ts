@@ -29,8 +29,14 @@ export const mockRedisInstance = {
   // redis.duplicate() (used by the WebSocket server for a pub/sub
   // subscriber connection) returns another client — hand back the same
   // shared mock so tests only ever have one instance to reason about.
-  duplicate: jest.fn(() => mockRedisInstance),
+  // Attached below rather than inline: a property whose value refers back
+  // to the object literal it's part of is a circular reference TS can't
+  // infer a type for (TS7022/TS7024), so the literal has to fully resolve
+  // its own type first.
+  duplicate: jest.fn(),
 };
+
+mockRedisInstance.duplicate.mockImplementation(() => mockRedisInstance);
 
 // `new Redis(config)` in src/config/redis.ts needs a constructable default
 // export. A class constructor that explicitly returns an object makes `new`
