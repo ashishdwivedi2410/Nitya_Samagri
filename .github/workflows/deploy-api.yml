@@ -121,7 +121,10 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context:    ./backend
+          # Monorepo build: package-lock.json lives at the repo root (npm
+          # workspaces), not inside backend/, so context must be root — same
+          # pattern as the admin/web build steps.
+          context:    .
           file:       ./backend/Dockerfile
           target:     production
           push:       true
@@ -186,5 +189,3 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
-
-          
