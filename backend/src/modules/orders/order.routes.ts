@@ -319,6 +319,14 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
     }
   }
 
+  // Every path through the loop above either assigns `order` and breaks, or
+  // throws (propagating out of this handler) — so this is unreachable in
+  // practice. TS's control-flow analysis can't prove that across an
+  // imperative for/try loop, so this guard both satisfies the type checker
+  // and gives a real error instead of a silent undefined-access crash if the
+  // loop's invariant is ever broken by a future edit.
+  if (!order) throw new AppError("Failed to create order — please try again", 500);
+
   // 5. Notify admin via WebSocket
   emitToAdmins({
     event:   "NEW_ORDER_ALERT",

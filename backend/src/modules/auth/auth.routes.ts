@@ -59,15 +59,23 @@ function generateOTP(): string {
 }
 
 function signTokens(userId: string, role: string) {
+  // @types/jsonwebtoken types `expiresIn` as `number | StringValue`, a strict
+  // template-literal union (e.g. "15m", "30d") rather than plain `string`.
+  // Env vars are always widened to `string` by TS, so assert them to the
+  // type jwt.sign expects — the runtime value is validated by the `ms`
+  // package inside jsonwebtoken itself either way.
+  const accessTokenExpiresIn = (process.env.JWT_EXPIRES_IN || "15m") as jwt.SignOptions["expiresIn"];
+  const refreshTokenExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN || "30d") as jwt.SignOptions["expiresIn"];
+
   const accessToken = jwt.sign(
     { userId, role },
     process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "15m" }
+    { expiresIn: accessTokenExpiresIn }
   );
   const refreshToken = jwt.sign(
     { userId, role, type: "refresh" },
     process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d" }
+    { expiresIn: refreshTokenExpiresIn }
   );
   return { accessToken, refreshToken };
 }

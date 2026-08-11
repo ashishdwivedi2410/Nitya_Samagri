@@ -78,7 +78,11 @@ const ProductQuerySchema = z.object({
  * List products with filtering, search, pagination
  */
 router.get("/", validate(ProductQuerySchema, "query"), asyncHandler(async (req: Request, res: Response) => {
-  const q = req.query as z.infer<typeof ProductQuerySchema>;
+  // The `validate` middleware overwrites req.query with the parsed/coerced
+  // result at runtime, but req.query's static type (ParsedQs) doesn't
+  // structurally overlap with the parsed shape, so a direct `as` cast is
+  // rejected. Route through `unknown` since this is a genuinely safe cast.
+  const q = req.query as unknown as z.infer<typeof ProductQuerySchema>;
   const cacheKey = `products:list:${JSON.stringify(q)}`;
 
   // Check cache
