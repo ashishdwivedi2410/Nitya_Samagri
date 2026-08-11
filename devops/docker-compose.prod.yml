@@ -30,7 +30,7 @@ x-api-common: &api-common
     context: ./backend
     dockerfile: Dockerfile
     target: production
-  env_file: ./backend/.env
+  env_file: ../backend/.env
   environment:
     DATABASE_URL:   postgresql://postgres:${POSTGRES_PASSWORD:-nityasamagri_dev}@postgres:5432/nityasamagri
     REDIS_HOST:     redis

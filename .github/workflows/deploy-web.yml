@@ -95,20 +95,35 @@ jobs:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SERVER_SSH_KEY }}
+          envs:     NEW_TAG
           script: |
             set -e
             cd ~/nityasamagri
             git pull origin main
+
+            # Production only knows web_blue / web_green (see
+            # docker-compose.prod.yml) — there's no bare "web" service.
+            # This workflow deploys just the web app, so rather than doing
+            # a full blue/green swap (which would also have to flip the
+            # shared .active_color file that deploy-scheduled.yml uses to
+            # keep api/web/admin in sync), it updates whichever color is
+            # already live, in place.
+            ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
+            echo "Currently live color: $ACTIVE — updating web_$ACTIVE in place."
+
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG
+            docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
+
             docker compose -f devops/docker-compose.yml \
                            -f devops/docker-compose.prod.yml \
-                           pull web
-            docker compose -f devops/docker-compose.yml \
-                           -f devops/docker-compose.prod.yml \
-                           up -d --no-deps web
+                           up -d --no-deps web_$ACTIVE
+
             sleep 10
             curl -sf https://livetestingserver.com || exit 1
             docker image prune -f
-            echo "✅ Customer web deployed!"
+            echo "✅ Customer web deployed (color: $ACTIVE)!"
+        env:
+          NEW_TAG: ${{ github.sha }}
 
       - name: Smoke test
         run: |
