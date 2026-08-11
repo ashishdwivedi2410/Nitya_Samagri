@@ -99,11 +99,11 @@ jobs:
             set -e
             cd ~/nityasamagri
             git pull origin main
-            docker compose -f docker-compose.yml \
-                           -f docker-compose.prod.yml \
+            docker compose -f devops/docker-compose.yml \
+                           -f devops/docker-compose.prod.yml \
                            pull web
-            docker compose -f docker-compose.yml \
-                           -f docker-compose.prod.yml \
+            docker compose -f devops/docker-compose.yml \
+                           -f devops/docker-compose.prod.yml \
                            up -d --no-deps web
             sleep 10
             curl -sf https://livetestingserver.com || exit 1
