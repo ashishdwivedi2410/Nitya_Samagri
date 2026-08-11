@@ -21,7 +21,7 @@ export function isAdminAuthed() {
 
 // Mock login — accepts any non-empty email + password (min 6 chars), like the
 // rest of this codebase's mock forms. Replace with a real API call later.
-export function mockAdminLogin(email, password) {
+export function mockAdminLogin(email: string, password: string) {
   if (!email || !password || password.length < 6) return { ok: false };
   const session = { email, role: "ADMIN", name: "Super Admin", loggedInAt: Date.now() };
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));

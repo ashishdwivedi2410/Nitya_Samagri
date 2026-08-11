@@ -71,7 +71,9 @@ function Card({ children, style={} }) {
   return <div style={{ background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,...style }}>{children}</div>;
 }
 
-function Input({ label, type="text", value, onChange, placeholder, helper, prefix, suffix }) {
+function Input({ label, type="text", value, onChange, placeholder, helper, prefix, suffix }: {
+  label?: string; type?: string; value: any; onChange: (e: any) => void; placeholder?: string; helper?: string; prefix?: string; suffix?: string;
+}) {
   const [focused, setFocused] = useState(false);
   return (
     <div style={{ marginBottom:16 }}>
@@ -298,7 +300,7 @@ function CouponForm({ initial, onSave, onCancel }) {
 // ─── CUSTOMER COUPON APPLY UI ─────────────────────────────────────────────────
 function CustomerCouponApply({ orderValue=799 }) {
   const [input,    setInput]    = useState("");
-  const [applied,  setApplied]  = useState(null);
+  const [applied,  setApplied]  = useState<typeof INIT_COUPONS[number] | null>(null);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
   const [showList, setShowList] = useState(false);
@@ -411,8 +413,8 @@ function AdminCoupons() {
   const [filter,  setFilter]    = useState("All");
   const [search,  setSearch]    = useState("");
   const [showForm,setShowForm]  = useState(false);
-  const [editing, setEditing]   = useState(null);
-  const [selected,setSelected]  = useState(null);
+  const [editing, setEditing]   = useState<typeof INIT_COUPONS[number] | null>(null);
+  const [selected,setSelected]  = useState<string | null>(null);
 
   const filters = ["All","Active","Paused","Expired","Festival"];
   const isExpired = c => new Date(c.expiresAt) < new Date();
@@ -486,12 +488,12 @@ function AdminCoupons() {
           <Card style={{ padding:"22px" }}>
             <div style={{ fontFamily:"'Georgia',serif",fontSize:17,color:C.text,marginBottom:16 }}>Coupon Analytics — <span style={{ color:C.saffron,fontFamily:"'Courier New',monospace" }}>{c.code}</span></div>
             <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14 }}>
-              {[
+              {([
                 ["Total Uses",c.usedCount,"👆",C.blue],
                 ["Remaining",c.usageLimit?c.usageLimit-c.usedCount:"∞","📦",C.green],
                 ["Discount Given",`₹${c.usedCount*(c.type==="flat"?c.value:Math.round(599*c.value/100))}`.replace("NaN","—"),"💸",C.red],
                 ["Conversion","8.5%","📈",C.purple],
-              ].map(([label,val,icon,color])=>(
+              ] as [string, string | number, string, string][]).map(([label,val,icon,color])=>(
                 <div key={label} style={{ background:C.bgHover,borderRadius:12,padding:"14px 16px",textAlign:"center" }}>
                   <div style={{ fontSize:22,marginBottom:4 }}>{icon}</div>
                   <div style={{ fontSize:20,fontWeight:700,color }}>{val}</div>

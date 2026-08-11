@@ -5,13 +5,14 @@
 // Redirects to /login if no session is found. Mock/local-only for now — see
 // _lib/adminAuth.ts for the note on wiring this to the real API.
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminAuthed } from "../_lib/adminAuth";
 
 const C = { bg: "#0D0D0F", saffron: "#E8560A", text: "#F1F0EE", textLight: "#5A5856" };
 
-export default function RequireAuth({ children }) {
+export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [status, setStatus] = useState("checking"); // "checking" | "authed" | "redirecting"
 

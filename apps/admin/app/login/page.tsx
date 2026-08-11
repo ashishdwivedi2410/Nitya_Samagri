@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { mockAdminLogin, isAdminAuthed } from "../_lib/adminAuth";
@@ -22,7 +23,7 @@ const C = {
   white:      "#FFFFFF",
 };
 
-const inputStyle = {
+const inputStyle: React.CSSProperties = {
   width: "100%", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${C.border}`,
   fontSize: 14, color: C.text, background: C.bgElevated, outline: "none", boxSizing: "border-box",
 };
@@ -39,7 +40,7 @@ export default function AdminLoginPage() {
     if (isAdminAuthed()) router.replace("/dashboard");
   }, [router]);
 
-  const submit = (e) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 

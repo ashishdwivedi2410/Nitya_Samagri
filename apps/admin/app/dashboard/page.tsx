@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import RequireAuth from "../_components/RequireAuth";
 import { clearAdminSession } from "../_lib/adminAuth";
@@ -106,7 +107,7 @@ const ALERTS = [
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-const STATUS_CFG = {
+const STATUS_CFG: Record<string, { color: string; bg: string }> = {
   Pending:   { color:C.marigold, bg:C.marigoldBg },
   Confirmed: { color:C.blue,     bg:C.blueBg     },
   Packed:    { color:C.purple,   bg:C.purpleBg   },
@@ -117,14 +118,14 @@ const STATUS_CFG = {
   Inactive:  { color:C.textMid,  bg:C.bgElevated },
   Blocked:   { color:C.red,      bg:C.redBg      },
 };
-const TIER_CFG = {
+const TIER_CFG: Record<string, { color: string; bg: string }> = {
   New:      { color:C.textMid,  bg:C.bgElevated },
   Silver:   { color:"#94A3B8",  bg:"#0F1520"    },
   Gold:     { color:C.gold,     bg:C.goldBg     },
   Platinum: { color:C.purple,   bg:C.purpleBg   },
 };
 
-function SBadge({ label, cfg }) {
+function SBadge({ label, cfg }: { label: string; cfg: Record<string, { color: string; bg: string }> }) {
   const s = cfg[label] || { color:C.textMid, bg:C.bgElevated };
   return <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:s.bg, color:s.color, fontSize:10, fontWeight:700, padding:"3px 9px", borderRadius:999 }}><span style={{ width:5, height:5, borderRadius:"50%", background:s.color }}/>{label}</span>;
 }
@@ -133,7 +134,7 @@ function Card({ children, style={} }) {
   return <div style={{ background:C.bgCard, borderRadius:14, border:`1px solid ${C.border}`, ...style }}>{children}</div>;
 }
 
-function SectionTitle({ title, sub, action }) {
+function SectionTitle({ title, sub, action }: { title: string; sub?: string; action?: React.ReactNode }) {
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
       <div>
@@ -148,8 +149,8 @@ function SectionTitle({ title, sub, action }) {
 function TH({ children }) {
   return <th style={{ padding:"10px 14px", fontSize:10, fontWeight:700, color:C.textLight, textAlign:"left", textTransform:"uppercase", letterSpacing:0.8, borderBottom:`1px solid ${C.border}`, whiteSpace:"nowrap" }}>{children}</th>;
 }
-function TD({ children, bold, color }) {
-  return <td style={{ padding:"12px 14px", fontSize:13, color:color||C.text, fontWeight:bold?700:400, whiteSpace:"nowrap", borderBottom:`1px solid ${C.border}` }}>{children}</td>;
+function TD({ children, bold, color, style }: { children: React.ReactNode; bold?: boolean; color?: string; style?: React.CSSProperties }) {
+  return <td style={{ padding:"12px 14px", fontSize:13, color:color||C.text, fontWeight:bold?700:400, whiteSpace:"nowrap", borderBottom:`1px solid ${C.border}`, ...style }}>{children}</td>;
 }
 
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
@@ -290,7 +291,7 @@ function OverviewView() {
 function OrdersView() {
   const [search,   setSearch]   = useState("");
   const [filter,   setFilter]   = useState("All");
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<typeof RECENT_ORDERS[number] | null>(null);
   const [page,     setPage]     = useState(1);
   const PER_PAGE = 6;
 
@@ -409,7 +410,7 @@ function OrdersView() {
 // ─── USERS ────────────────────────────────────────────────────────────────────
 function UsersView() {
   const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<typeof USERS[number] | null>(null);
   const [tierFilter, setTierFilter] = useState("All");
 
   const tiers = ["All","New","Silver","Gold","Platinum","Blocked"];

@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import RequireAuth from "../_components/RequireAuth";
 
@@ -105,11 +106,13 @@ function StatusPill({ status }) {
   return <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:s.bg, color:s.color, fontSize:10, fontWeight:700, padding:"3px 9px", borderRadius:999, textTransform:"capitalize" }}><span style={{ width:5, height:5, borderRadius:"50%", background:s.color }}/>{status}</span>;
 }
 
-function Card({ children, style={} }) {
-  return <div style={{ background:S.bgCard, borderRadius:14, border:`1px solid ${S.border}`, ...style }}>{children}</div>;
+function Card({ children, style={}, onClick, onMouseEnter, onMouseLeave }: {
+  children: React.ReactNode; style?: React.CSSProperties; onClick?: (e?: any) => void; onMouseEnter?: (e?: any) => void; onMouseLeave?: (e?: any) => void;
+}) {
+  return <div onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} style={{ background:S.bgCard, borderRadius:14, border:`1px solid ${S.border}`, ...style }}>{children}</div>;
 }
 
-function SectionTitle({ title, sub, action }) {
+function SectionTitle({ title, sub, action }: { title: string; sub?: string; action?: React.ReactNode }) {
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:24 }}>
       <div>
@@ -121,7 +124,7 @@ function SectionTitle({ title, sub, action }) {
   );
 }
 
-function Btn({ children, variant="primary", onClick, small }) {
+function Btn({ children, variant="primary", onClick=()=>{}, small=false }: { children: React.ReactNode; variant?: string; onClick?: (e?: any) => void; small?: boolean }) {
   const styles = {
     primary:  { bg:S.saffron,  color:S.white,    border:"none" },
     secondary:{ bg:"transparent", color:S.textMid, border:`1.5px solid ${S.border}` },
@@ -241,7 +244,7 @@ function HomepageCMS() {
 // ─── BANNERS ──────────────────────────────────────────────────────────────────
 function BannersView() {
   const [banners, setBanners] = useState(BANNERS);
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title:"", cta:"Shop Now", url:"", start:"", end:"", status:"draft" });
 
@@ -343,7 +346,7 @@ function BannersView() {
 // ─── FESTIVAL CAMPAIGNS ───────────────────────────────────────────────────────
 function FestivalsView() {
   const [festivals, setFestivals] = useState(FESTIVALS);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<typeof FESTIVALS[number] | null>(null);
   const [showNew, setShowNew] = useState(false);
 
   return (
@@ -566,8 +569,8 @@ function BlogView() {
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 function SEOView() {
   const [pages, setPages] = useState(SEO_PAGES);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<{ title?: string; desc?: string }>({});
 
   const scoreColor = s => s>=90?S.green:s>=75?S.marigold:S.red;
   const startEdit = (p) => { setEditing(p.id); setForm({ title:p.title, desc:p.desc }); };
