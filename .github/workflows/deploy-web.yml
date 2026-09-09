@@ -98,7 +98,7 @@ jobs:
           envs:     NEW_TAG
           script: |
             set -e
-            cd ~/nityasamagri
+            cd ~/Nitya_Samagri
             git pull origin main
 
             # Production only knows web_blue / web_green (see
