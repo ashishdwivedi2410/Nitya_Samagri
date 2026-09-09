@@ -67,12 +67,12 @@ jobs:
 
             # Pull new images
             docker compose -f devops/docker-compose.yml \
-                           -f docker-compose.prod.yml \
+                           -f devops/docker-compose.prod.yml \
                            pull admin
 
             # Restart admin
             docker compose -f devops/docker-compose.yml \
-                           -f docker-compose.prod.yml \
+                           -f devops/docker-compose.prod.yml \
                            up -d --no-deps admin
 
             sleep 10
