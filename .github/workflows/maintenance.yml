@@ -14,15 +14,15 @@ jobs:
     steps:
       - name: Check API health
         run: |
-          response=$(curl -sf https://api.nityasamagri.com/health)
+          response=$(curl -sf https://api.nityasamagri.in/health)
           echo "API: $response"
           echo "$response" | grep -q '"status":"ok"' || (echo "❌ API unhealthy!" && exit 1)
 
       - name: Check Customer Web
-        run: curl -sf https://nityasamagri.com -o /dev/null || echo "⚠️ Web might be down"
+        run: curl -sf https://nityasamagri.in -o /dev/null || echo "⚠️ Web might be down"
 
       - name: Check Admin Panel
-        run: curl -sf https://admin.nityasamagri.com -o /dev/null || echo "⚠️ Admin might be down"
+        run: curl -sf https://admin.nityasamagri.in -o /dev/null || echo "⚠️ Admin might be down"
 
       - name: All services healthy
         run: echo "✅ All services healthy at $(date)"
@@ -106,7 +106,7 @@ jobs:
         run: |
           response=$(curl -sf \
             -H "Authorization: Bearer ${{ secrets.ADMIN_API_TOKEN }}" \
-            "https://api.nityasamagri.com/api/v1/products?inStock=true&limit=100")
+            "https://api.nityasamagri.in/api/v1/products?inStock=true&limit=100")
 
           echo "Low stock check complete"
           echo "$response" | python3 -c "
@@ -130,7 +130,7 @@ jobs:
     steps:
       - name: Check SSL expiry for all domains
         run: |
-          for domain in nityasamagri.com admin.nityasamagri.com api.nityasamagri.com; do
+          for domain in nityasamagri.in admin.nityasamagri.in api.nityasamagri.in; do
             expiry=$(echo | openssl s_client -servername $domain -connect $domain:443 2>/dev/null | \
               openssl x509 -noout -dates 2>/dev/null | grep notAfter | cut -d= -f2)
             expiry_epoch=$(date -d "$expiry" +%s 2>/dev/null || echo 0)

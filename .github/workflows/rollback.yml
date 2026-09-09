@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url:  https://nityasamagri.com
+      url:  https://nityasamagri.in
 
     steps:
       - uses: actions/checkout@v4

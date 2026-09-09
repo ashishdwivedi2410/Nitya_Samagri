@@ -61,10 +61,10 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
+            NEXT_PUBLIC_API_URL=https://api.nityasamagri.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.in/ws
             NEXT_PUBLIC_RAZORPAY_KEY=${{ secrets.RAZORPAY_KEY_ID }}
-            NEXT_PUBLIC_APP_URL=https://nityasamagri.com
+            NEXT_PUBLIC_APP_URL=https://nityasamagri.in
 
       - name: Build & push Admin
         uses: docker/build-push-action@v5
@@ -77,9 +77,9 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
-            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.com
+            NEXT_PUBLIC_API_URL=https://api.nityasamagri.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.in/ws
+            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.in
 
   # ── Deploy to the idle color, test it directly, cut over if healthy ──────────
   deploy:
@@ -88,7 +88,7 @@ jobs:
     needs: build
     environment:
       name: production
-      url:  https://nityasamagri.com
+      url:  https://nityasamagri.in
 
     steps:
       - uses: actions/checkout@v4
