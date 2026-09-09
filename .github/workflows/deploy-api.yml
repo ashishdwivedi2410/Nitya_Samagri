@@ -154,7 +154,7 @@ jobs:
           timeout:  120s
           script: |
             set -e
-            cd ~/nityasamagri
+            cd ~/Nitya_Samagri
             git pull origin main
 
             # Pull new API image
