@@ -39,9 +39,9 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.com/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.com/ws
-            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.com
+            NEXT_PUBLIC_API_URL=https://api.nityasamagri.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.in/ws
+            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.in
 
   # ── Deploy Both to Lightsail ──────────────────────────────────────────────────
   deploy:
@@ -62,7 +62,7 @@ jobs:
           key:      ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
-            cd ~/nityasamagri
+            cd ~/Nitya_Samagri
             git pull origin main
 
             # Pull new images
@@ -78,7 +78,7 @@ jobs:
             sleep 10
 
             # Health checks
-            curl -sf https://admin.nityasamagri.com  || exit 1
+            curl -sf https://admin.nityasamagri.in  || exit 1
 
             docker image prune -f
             echo "✅ Admin panel deployed!"
