@@ -66,12 +66,12 @@ jobs:
             git pull origin main
 
             # Pull new images
-            docker compose -f docker-compose.yml \
+            docker compose -f devops/docker-compose.yml \
                            -f docker-compose.prod.yml \
                            pull admin
 
             # Restart admin
-            docker compose -f docker-compose.yml \
+            docker compose -f devops/docker-compose.yml \
                            -f docker-compose.prod.yml \
                            up -d --no-deps admin
 
