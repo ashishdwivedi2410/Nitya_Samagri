@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Check API health
         run: |
-          response=$(curl -sf https://api.nityasamagri.in/health)
+          response=$(curl -sf https://api.adminns.in/health)
           echo "API: $response"
           echo "$response" | grep -q '"status":"ok"' || (echo "❌ API unhealthy!" && exit 1)
 
@@ -22,7 +22,7 @@ jobs:
         run: curl -sf https://nityasamagri.in -o /dev/null || echo "⚠️ Web might be down"
 
       - name: Check Admin Panel
-        run: curl -sf https://admin.nityasamagri.in -o /dev/null || echo "⚠️ Admin might be down"
+        run: curl -sf https://adminns.in -o /dev/null || echo "⚠️ Admin might be down"
 
       - name: All services healthy
         run: echo "✅ All services healthy at $(date)"
@@ -106,7 +106,7 @@ jobs:
         run: |
           response=$(curl -sf \
             -H "Authorization: Bearer ${{ secrets.ADMIN_API_TOKEN }}" \
-            "https://api.nityasamagri.in/api/v1/products?inStock=true&limit=100")
+            "https://api.adminns.in/api/v1/products?inStock=true&limit=100")
 
           echo "Low stock check complete"
           echo "$response" | python3 -c "
