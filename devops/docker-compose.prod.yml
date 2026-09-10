@@ -90,12 +90,15 @@ services:
     <<: *web-common
     image: docker.io/nityasamagri/admin:blue
     container_name: nityasamagri_admin_blue
+    ports:
+      - "127.0.0.1:3001:3000"
 
   admin_green:
     <<: *web-common
     image: docker.io/nityasamagri/admin:green
     container_name: nityasamagri_admin_green
-
+    ports:
+      - "127.0.0.1:3002:3000"
   # ── Smoke-test runner ─────────────────────────────────────────────────────────
   # A throwaway container attached to the same internal network, used to curl
   # the *idle* color directly (e.g. http://api_green:4000/health) before it
