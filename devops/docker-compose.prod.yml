@@ -49,7 +49,11 @@ x-api-common: &api-common
   # reach these. The public-facing port is always 80/443 on the nginx service.
 
 x-web-common: &web-common
-  command: node server.js
+  # No `command:` override here — web and admin's standalone builds nest
+  # their entrypoint at apps/<app>/server.js (see the Dockerfile comments),
+  # and each image's own CMD already points at the right nested path.
+  # A shared "node server.js" here would look for the wrong, flat path
+  # (/app/server.js) and crash-loop both containers on start.
   environment:
     NODE_ENV: production
   restart: unless-stopped
