@@ -312,7 +312,7 @@ export class RazorpayService {
       currency:    "INR",
       name:        "nityasamagri",
       description: `Order ${params.orderRef}`,
-      image:       "https://nityasamagri.com/logo.png",
+      image:       "https://nityasamagri.in/logo.png",
       order_id:    params.orderId,
       prefill: {
         name:    params.name,

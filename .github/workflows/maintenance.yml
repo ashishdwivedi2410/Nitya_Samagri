@@ -130,7 +130,7 @@ jobs:
     steps:
       - name: Check SSL expiry for all domains
         run: |
-          for domain in nityasamagri.in admin.nityasamagri.in api.nityasamagri.in; do
+          for domain in nityasamagri.in adminns.in api.adminns.in; do
             expiry=$(echo | openssl s_client -servername $domain -connect $domain:443 2>/dev/null | \
               openssl x509 -noout -dates 2>/dev/null | grep notAfter | cut -d= -f2)
             expiry_epoch=$(date -d "$expiry" +%s 2>/dev/null || echo 0)

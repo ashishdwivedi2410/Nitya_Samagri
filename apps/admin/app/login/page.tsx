@@ -77,7 +77,7 @@ export default function AdminLoginPage() {
           <form onSubmit={submit}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 6 }}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@nityasamagri.com" style={inputStyle} autoFocus />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@nityasamagri.in" style={inputStyle} autoFocus />
             </div>
             <div style={{ marginBottom: 8 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 6 }}>Password</label>

@@ -752,7 +752,7 @@ export default function AdminDashboard() {
             <div style={{ width:32, height:32, borderRadius:"50%", background:C.saffronBg, border:`2px solid ${C.saffron}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:C.saffron }}>SA</div>
             <div>
               <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Super Admin</div>
-              <div style={{ fontSize:10, color:C.textLight }}>admin@nityasamagri.com</div>
+              <div style={{ fontSize:10, color:C.textLight }}>admin@nityasamagri.in</div>
             </div>
           </div>
           <button onClick={logOut} style={{ width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:"transparent", color:C.textMid, fontWeight:600, fontSize:11, cursor:"pointer" }}>

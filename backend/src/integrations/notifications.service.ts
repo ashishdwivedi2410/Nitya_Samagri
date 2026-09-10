@@ -77,7 +77,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "welcome_message",
     language: "hi",
     smsText: ({ name, points }) =>
-      `Jai Shri Ram! Welcome to nityasamagri, ${name}! 🪔 ${points} reward points added to your account. Shop puja samagri & book pandits at nityasamagri.com`,
+      `Jai Shri Ram! Welcome to nityasamagri, ${name}! 🪔 ${points} reward points added to your account. Shop puja samagri & book pandits at nityasamagri.in`,
     waParams: ({ name, points }) => [name, points],
   },
 
@@ -87,7 +87,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_confirmed",
     language: "hi",
     smsText: ({ name, orderId, amount, eta }) =>
-      `${name} ji, aapka order ${orderId} confirm ho gaya! 🪔 Amount: ₹${amount}. Estimated delivery: ${eta}. Track: nityasamagri.com/track/${orderId}`,
+      `${name} ji, aapka order ${orderId} confirm ho gaya! 🪔 Amount: ₹${amount}. Estimated delivery: ${eta}. Track: nityasamagri.in/track/${orderId}`,
     waParams: ({ name, orderId, amount, eta }) => [name, orderId, amount, eta],
   },
 
@@ -103,7 +103,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_shipped",
     language: "hi",
     smsText: ({ name, orderId, courier, awb, eta }) =>
-      `${name} ji, aapka order ${orderId} ship ho gaya! 🚚 Courier: ${courier} | AWB: ${awb} | ETA: ${eta}. Track: nityasamagri.com/track/${awb}`,
+      `${name} ji, aapka order ${orderId} ship ho gaya! 🚚 Courier: ${courier} | AWB: ${awb} | ETA: ${eta}. Track: nityasamagri.in/track/${awb}`,
     waParams: ({ name, orderId, courier, awb, eta }) => [name, orderId, courier, awb, eta],
   },
 
@@ -119,7 +119,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "order_delivered",
     language: "hi",
     smsText: ({ name, orderId }) =>
-      `${name} ji, aapka order ${orderId} deliver ho gaya! ✅ 🙏 Dhanyawad nityasamagri par shopping karne ke liye. Review dijiye: nityasamagri.com/review`,
+      `${name} ji, aapka order ${orderId} deliver ho gaya! ✅ 🙏 Dhanyawad nityasamagri par shopping karne ke liye. Review dijiye: nityasamagri.in/review`,
     waParams: ({ name, orderId }) => [name, orderId],
   },
 
@@ -145,7 +145,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "payment_failed",
     language: "en",
     smsText: ({ name, orderId, amount }) =>
-      `Payment of ₹${amount} failed for order ${orderId}. Please retry at nityasamagri.com/orders or contact support: 8595427053 - nityasamagri`,
+      `Payment of ₹${amount} failed for order ${orderId}. Please retry at nityasamagri.in/orders or contact support: 8595427053 - nityasamagri`,
     waParams: ({ name, orderId, amount }) => [name, orderId, amount],
   },
 
@@ -181,7 +181,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "booking_completed",
     language: "hi",
     smsText: ({ name, ceremony, panditName }) =>
-      `${name} ji, aapki ${ceremony} safaltapoorvak sampann hui! 🙏 Pandit ${panditName} ko review dijiye: nityasamagri.com/review. Dhanyawad! - nityasamagri`,
+      `${name} ji, aapki ${ceremony} safaltapoorvak sampann hui! 🙏 Pandit ${panditName} ko review dijiye: nityasamagri.in/review. Dhanyawad! - nityasamagri`,
     waParams: ({ name, ceremony, panditName }) => [name, ceremony, panditName],
   },
 
@@ -199,7 +199,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "pandit_new_booking",
     language: "hi",
     smsText: ({ panditName, ceremony, customerName, date, time, address }) =>
-      `Namaskar ${panditName} ji! Naya booking request: ${ceremony} | Customer: ${customerName} | Date: ${date} | Time: ${time} | Address: ${address}. Accept/Reject: nityasamagri.com/pandit`,
+      `Namaskar ${panditName} ji! Naya booking request: ${ceremony} | Customer: ${customerName} | Date: ${date} | Time: ${time} | Address: ${address}. Accept/Reject: nityasamagri.in/pandit`,
     waParams: ({ panditName, ceremony, customerName, date, time, address }) =>
       [panditName, ceremony, customerName, date, time, address],
   },
@@ -219,7 +219,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
     waTemplateName: "festival_offer",
     language: "hi",
     smsText: ({ name, festival, discount, code, expiry }) =>
-      `${name} ji, ${festival} ki shubhkamnayein! 🪔 ${discount}% ki special chhoot. Coupon: ${code}. Offer ${expiry} tak valid. Shop: nityasamagri.com - nityasamagri`,
+      `${name} ji, ${festival} ki shubhkamnayein! 🪔 ${discount}% ki special chhoot. Coupon: ${code}. Offer ${expiry} tak valid. Shop: nityasamagri.in - nityasamagri`,
     waParams: ({ name, festival, discount, code, expiry }) =>
       [name, festival, discount, code, expiry],
   },

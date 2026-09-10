@@ -1,7 +1,7 @@
 # 🪔 nityasamagri — Complete API Documentation
 
-> **Base URL:** `https://api.nityasamagri.com/api/v1`
-> **WebSocket:** `wss://api.nityasamagri.com/ws`
+> **Base URL:** `https://api.adminns.in/api/v1`
+> **WebSocket:** `wss://api.adminns.in/ws`
 > **Version:** 1.0.0 · **Last Updated:** June 2026
 
 ---
@@ -1166,7 +1166,7 @@ Authorization: Bearer <admin_token>
 ### Connect
 ```javascript
 const token = "your_access_token";
-const ws = new WebSocket(`wss://api.thenityasamagri.com/ws?token=${token}`);
+const ws = new WebSocket(`wss://api.adminns.in/ws?token=${token}`);
 ```
 
 ### Events sent to customer
@@ -1317,4 +1317,4 @@ All list endpoints return pagination metadata:
 
 ---
 
-*© 2026 Thenityasamagri · Mohali, Punjab · support@thenityasamagri.com*
+*© 2026 nityasamagri · Mohali, Punjab · support@nityasamagri.in*

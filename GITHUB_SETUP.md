@@ -301,10 +301,10 @@ cp backend/.env.example backend/.env
 nano backend/.env   # fill all values
 
 # Get SSL certificate
-sudo certbot certonly --standalone -d nityasamagri.com \
-  -d www.nityasamagri.com \
-  -d admin.nityasamagri.com \
-  -d api.nityasamagri.com
+sudo certbot certonly --standalone -d nityasamagri.in \
+  -d www.nityasamagri.in \
+  -d adminns.in \
+  -d api.adminns.in
 
 # Start production stack
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d

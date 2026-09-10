@@ -150,7 +150,7 @@ function buildOrderConfirmationEmail(order: OrderConfirmationData, customerName:
     </table>
     ${addressBlock ? `<p style="margin-top:16px;font-size:14px;"><strong>Shipping to</strong><br>${addressBlock}</p>` : ""}
     <p style="margin-top:24px;font-size:14px;color:#555;">
-      You can track your order anytime at <a href="https://nityasamagri.com/orders" style="color:#b45309;">nityasamagri.com/orders</a>.
+      You can track your order anytime at <a href="https://nityasamagri.in/orders" style="color:#b45309;">nityasamagri.in/orders</a>.
     </p>
   </div>`;
 }
@@ -337,7 +337,7 @@ router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (
   // failure should never fail order placement, which has already succeeded)
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true, email: true } });
   if (user?.phone) {
-    sendSMS(user.phone, `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.com/orders`).catch(() => {});
+    sendSMS(user.phone, `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.in/orders`).catch(() => {});
   }
   if (user?.email) {
     sendEmail({

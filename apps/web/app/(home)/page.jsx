@@ -333,7 +333,7 @@ export default function StoreFront() {
               <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 280, marginBottom: 16 }}>
                 India's most trusted platform for pure puja samagri. Bringing divinity to your doorstep since 2024.
               </p>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>📍 Mohali, Punjab · support@nityasamagri.com</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>📍 Mohali, Punjab · support@nityasamagri.in</div>
             </div>
             {[
               { title: "Shop", links: ["Puja Samagri", "Ghee & Oils", "Hawan Items", "Idols & Books", "Festival Kits"] },

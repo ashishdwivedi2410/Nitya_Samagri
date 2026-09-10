@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://nityasamagri.com"),
+  metadataBase: new URL("https://nityasamagri.in"),
   title: {
     default:  "nityasamagri — Pure Puja Samagri",
     template: "%s | nityasamagri",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "online puja store india",
     "buy puja items online",
   ],
-  authors:   [{ name: "nityasamagri", url: "https://nityasamagri.com" }],
+  authors:   [{ name: "nityasamagri", url: "https://nityasamagri.in" }],
   creator:   "nityasamagri",
   publisher: "nityasamagri",
   robots: {
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   openGraph: {
     type:        "website",
     locale:      "en_IN",
-    url:         "https://nityasamagri.com",
+    url:         "https://nityasamagri.in",
     siteName:    "nityasamagri",
     title:       "nityasamagri — Pure Puja Samagri",
     description: "Order pure, temple-grade puja samagri online. Delivered anywhere in India.",

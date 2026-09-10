@@ -516,7 +516,7 @@ function BlogView() {
           <div style={{ marginTop:14, padding:"14px 16px", background:S.bgHover, borderRadius:10, border:`1px solid ${S.border}` }}>
             <div style={{ fontSize:11, fontWeight:700, color:S.textLight, marginBottom:8, textTransform:"uppercase", letterSpacing:0.6 }}>SEO Preview</div>
             <div style={{ fontSize:16, color:S.blue, fontWeight:600, marginBottom:2 }}>{draftTitle || "Post title will appear here"}</div>
-            <div style={{ fontSize:12, color:S.green, marginBottom:4 }}>nityasamagri.com/blog/{(draftTitle||"post-title").toLowerCase().replace(/[^a-z0-9]+/g,"-")}</div>
+            <div style={{ fontSize:12, color:S.green, marginBottom:4 }}>nityasamagri.in/blog/{(draftTitle||"post-title").toLowerCase().replace(/[^a-z0-9]+/g,"-")}</div>
             <div style={{ fontSize:13, color:S.textMid }}>Meta description will be auto-generated from the first 160 characters of your content.</div>
           </div>
           <div style={{ display:"flex", gap:10, marginTop:14 }}>

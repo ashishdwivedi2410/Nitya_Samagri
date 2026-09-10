@@ -393,7 +393,7 @@ async function main() {
       update: {},
       create: {
         name: "Super Admin", phone: "+919999000001",
-        email: "admin@nityasamagri.com",
+        email: "admin@nityasamagri.in",
         password: hashedPassword, role: "super_admin",
         isVerified: true, status: "active",
         loyaltyPoints: 0, loyaltyTier: "platinum",
@@ -405,7 +405,7 @@ async function main() {
       update: {},
       create: {
         name: "Store Manager", phone: "+919999000002",
-        email: "manager@nityasamagri.com",
+        email: "manager@nityasamagri.in",
         password: hashedPassword, role: "admin",
         isVerified: true, status: "active",
         loyaltyPoints: 0,

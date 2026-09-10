@@ -36,9 +36,9 @@ nityasamagri is a **production-grade, full-stack spiritual e-commerce platform**
  
 | User | Panel | URL |
 |------|-------|-----|
-| 👤 Customer | Storefront | `nityasamagri.com` |
-| 🛠️ Admin | Admin Dashboard | `admin.nityasamagri.com` |
-| 🔌 Developers | REST API | `api.nityasamagri.com` |
+| 👤 Customer | Storefront | `nityasamagri.in` |
+| 🛠️ Admin | Admin Dashboard | `adminns.in` |
+| 🔌 Developers | REST API | `api.adminns.in` |
  
 ### Core Features
 - 🛒 **E-commerce** — 1,250+ puja products with variants, bundles, and festival kits
@@ -55,11 +55,11 @@ nityasamagri is a **production-grade, full-stack spiritual e-commerce platform**
 ## 🌐 Live URLs
  
 ```
-Customer Storefront  →  https://nityasamagri.com
-Admin Panel          →  https://admin.nityasamagri.com
-REST API             →  https://api.nityasamagri.com
-API Health           →  https://api.nityasamagri.com/health
-WebSocket            →  wss://api.nityasamagri.com/ws
+Customer Storefront  →  https://nityasamagri.in
+Admin Panel          →  https://adminns.in
+REST API             →  https://api.adminns.in
+API Health           →  https://api.adminns.in/health
+WebSocket            →  wss://api.adminns.in/ws
 ```
  
 ---
@@ -295,7 +295,7 @@ TWILIO_PHONE=+1XXXXXXXXXX
  
 # SendGrid (Email)
 SENDGRID_API_KEY=SG.XXXXXXXXXXXXXXXXXXXXXXXX
-SENDGRID_FROM_EMAIL=noreply@nityasamagri.com
+SENDGRID_FROM_EMAIL=noreply@nityasamagri.in
  
 # AWS S3 (Media)
 AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXX
@@ -311,7 +311,7 @@ AWS_S3_BUCKET=nityasamagri-media
 ### Base URL
 ```
 Development:  http://localhost:4000/api/v1
-Production:   https://api.nityasamagri.com/api/v1
+Production:   https://api.adminns.in/api/v1
 ```
  
 ### Authentication
@@ -406,7 +406,7 @@ GET    /payments/history       My payment history
  
 ### Connect
 ```js
-const ws = new WebSocket(`wss://api.nityasamagri.com/ws?token=${accessToken}`);
+const ws = new WebSocket(`wss://api.adminns.in/ws?token=${accessToken}`);
 ```
  
 ### Events received by customer
@@ -502,10 +502,10 @@ newgrp docker
 # 4. Install Certbot for SSL
 sudo apt install -y certbot
 sudo certbot certonly --standalone \
-  -d nityasamagri.com \
-  -d www.nityasamagri.com \
-  -d admin.nityasamagri.com \
-  -d api.nityasamagri.com
+  -d nityasamagri.in \
+  -d www.nityasamagri.in \
+  -d adminns.in \
+  -d api.adminns.in
  
 # 5. Clone and configure
 git clone https://github.com/YOUR_USERNAME/nityasamagri.git
@@ -576,7 +576,7 @@ jobs:
 RAZORPAY_KEY_ID=rzp_live_XXXXX
 RAZORPAY_KEY_SECRET=XXXXX
 # 4. Dashboard → Webhooks → Add webhook URL:
-#    https://api.nityasamagri.com/api/v1/payments/webhook
+#    https://api.adminns.in/api/v1/payments/webhook
 # 5. Select events: payment.captured, payment.failed, refund.processed
 ```
  
@@ -644,7 +644,7 @@ MIT License — see [LICENSE](LICENSE) for details.
  
 ## 🙏 Support
  
-- **Email:** support@nityasamagri.com
+- **Email:** support@nityasamagri.in
 - **Phone:** +91 8595427053
 - **WhatsApp:** +91 8595427053
 - **Location:** Mohali, Punjab, India
