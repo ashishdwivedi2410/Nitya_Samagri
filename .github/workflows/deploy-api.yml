@@ -140,7 +140,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
-      url:  https://api.nityasamagri.in/health
+      url:  https://api.adminns.in/health
 
     steps:
       - uses: actions/checkout@v4
@@ -169,7 +169,7 @@ jobs:
 
             # Wait and health check
             sleep 15
-            curl -sf https://api.nityasamagri.in/health || exit 1
+            curl -sf https://api.adminns.in/health || exit 1
 
             # Run migrations
             docker compose -f devops/docker-compose.yml \
@@ -189,5 +189,3 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
-
-          

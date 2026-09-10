@@ -61,8 +61,8 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.in/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.in/ws
+            NEXT_PUBLIC_API_URL=https://api.adminns.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.adminns.in/ws
             NEXT_PUBLIC_RAZORPAY_KEY=${{ secrets.RAZORPAY_KEY_ID }}
             NEXT_PUBLIC_APP_URL=https://nityasamagri.in
 
@@ -77,9 +77,9 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api.nityasamagri.in/api/v1
-            NEXT_PUBLIC_WS_URL=wss://api.nityasamagri.in/ws
-            NEXT_PUBLIC_APP_URL=https://admin.nityasamagri.in
+            NEXT_PUBLIC_API_URL=https://api.adminns.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.adminns.in/ws
+            NEXT_PUBLIC_APP_URL=https://adminns.in
 
   # ── Deploy to the idle color, test it directly, cut over if healthy ──────────
   deploy:
@@ -108,13 +108,13 @@ jobs:
           envs:     NEW_TAG
           script: |
             set -e
-            cd ~/nityasamagri
+            cd ~/Nitya_Samagri
             git pull origin main
 
-            STATE_FILE=~/nityasamagri/.active_color
+            STATE_FILE=~/Nitya_Samagri/.active_color
             ACTIVE=$(cat "$STATE_FILE" 2>/dev/null || echo blue)
             if [ "$ACTIVE" = "blue" ]; then IDLE=green; else IDLE=blue; fi
-            echo "$IDLE" > ~/nityasamagri/.idle_color   # so later steps agree on which color we're testing
+            echo "$IDLE" > ~/Nitya_Samagri/.idle_color   # so later steps agree on which color we're testing
             echo "Currently live: $ACTIVE   Deploying to: $IDLE   Tag: $NEW_TAG"
 
             for svc in api web admin; do
@@ -122,16 +122,16 @@ jobs:
               docker tag  ${{ env.REGISTRY }}/nityasamagri/$svc:$NEW_TAG ${{ env.REGISTRY }}/nityasamagri/$svc:$IDLE
             done
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
               up -d --no-deps api_$IDLE web_$IDLE admin_$IDLE
 
             sleep 20
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
               exec -T api_$IDLE npx prisma migrate deploy
 
             echo "🔎 Green-testing the idle ($IDLE) containers directly — no public traffic involved yet."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
               run --rm --no-deps smoketest "
                 set -e
                 curl -sf --max-time 10 http://api_${IDLE}:4000/health | grep -q '\"status\":\"ok\"'
@@ -156,16 +156,16 @@ jobs:
           timeout:  120s
           script: |
             set -e
-            cd ~/nityasamagri
-            IDLE=$(cat ~/nityasamagri/.idle_color)
+            cd ~/Nitya_Samagri
+            IDLE=$(cat ~/Nitya_Samagri/.idle_color)
 
             for svc in api web admin; do
               cp docker/nginx/active/${svc}-backend.${IDLE}.conf docker/nginx/active/${svc}-backend.conf
             done
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T nginx nginx -s reload
+            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml exec -T nginx nginx -s reload
 
-            echo "$IDLE" > ~/nityasamagri/.active_color
+            echo "$IDLE" > ~/Nitya_Samagri/.active_color
             echo "✅ Traffic cut over to $IDLE."
 
       # Confirms the cutover actually worked from the outside — real public
@@ -193,13 +193,13 @@ jobs:
           key:      ${{ secrets.SERVER_SSH_KEY }}
           timeout:  120s
           script: |
-            cd ~/nityasamagri
-            IDLE=$(cat ~/nityasamagri/.idle_color 2>/dev/null || echo "")
-            ACTIVE=$(cat ~/nityasamagri/.active_color 2>/dev/null || echo blue)
+            cd ~/Nitya_Samagri
+            IDLE=$(cat ~/Nitya_Samagri/.idle_color 2>/dev/null || echo "")
+            ACTIVE=$(cat ~/Nitya_Samagri/.active_color 2>/dev/null || echo blue)
 
             if [ -n "$IDLE" ] && [ "$IDLE" != "$ACTIVE" ]; then
               echo "🧹 Stopping unhealthy $IDLE containers — $ACTIVE never stopped serving traffic."
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml stop api_$IDLE web_$IDLE admin_$IDLE || true
+              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml stop api_$IDLE web_$IDLE admin_$IDLE || true
             else
               # We got here after a successful cutover, meaning the *public*
               # verification step failed — traffic IS on the bad color.
@@ -209,8 +209,8 @@ jobs:
               for svc in api web admin; do
                 cp docker/nginx/active/${svc}-backend.${PREV}.conf docker/nginx/active/${svc}-backend.conf
               done
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T nginx nginx -s reload
-              echo "$PREV" > ~/nityasamagri/.active_color
+              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml exec -T nginx nginx -s reload
+              echo "$PREV" > ~/Nitya_Samagri/.active_color
               echo "🔙 Rolled back to $PREV."
             fi
 
@@ -218,7 +218,3 @@ jobs:
         if: failure()
         run: |
           echo "::error::Scheduled deploy failed. If this happened before cutover, production was never affected. If it happened after cutover (rare), nginx has been rolled back to the previous color — check the 'Clean up failed idle deploy' step's log above to see which case this was."
-
-          
-
-          
