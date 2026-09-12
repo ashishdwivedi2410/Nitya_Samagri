@@ -111,8 +111,24 @@ jobs:
             ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
             echo "Currently live color: $ACTIVE — updating web_$ACTIVE in place."
 
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG
-            docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
+            # docker pull occasionally fails mid-layer-download against Docker Hub
+            # (transient registry hiccup / partial blob), which aborts the whole
+            # deploy under `set -e` before the tag/compose/curl steps ever run.
+            # Retry a few times with backoff before giving up for real.
+            PULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG"
+            for attempt in 1 2 3 4 5; do
+              echo "Pulling $PULL_IMAGE (attempt $attempt/5)..."
+              if docker pull "$PULL_IMAGE"; then
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                echo "❌ docker pull failed after 5 attempts — aborting deploy."
+                exit 1
+              fi
+              sleep $((attempt * 5))
+            done
+
+            docker tag  "$PULL_IMAGE" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
 
             docker compose -f devops/docker-compose.yml \
                            -f devops/docker-compose.prod.yml \
@@ -134,5 +150,3 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
-
-          
