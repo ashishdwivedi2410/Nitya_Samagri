@@ -164,15 +164,37 @@ jobs:
                 echo "── Diagnostics: internal check (bypasses nginx/SSL/DNS) ──"
                 if docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
                      exec -T web_$ACTIVE wget -qO- http://localhost:3000/ > /dev/null 2>&1; then
-                  echo "   ✅ App responds on :3000 inside its own container — the app is fine, this is an nginx/DNS/SSL routing problem."
-                else
-                  echo "   ❌ App does NOT respond on :3000 inside its own container — the app itself is failing to boot. See logs below."
-                fi
+                  echo "   ✅ App responds on :3000 inside its own container — the app is fine, this is an nginx-side routing problem."
+                  echo ""
+                  echo "── Diagnostics: nginx container status ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    ps nginx
 
-                echo ""
-                echo "── Diagnostics: last 100 log lines from web_$ACTIVE ──"
-                docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
-                  logs --tail=100 web_$ACTIVE
+                  echo ""
+                  echo "── Diagnostics: can nginx itself reach web_$ACTIVE over the docker network? ──"
+                  if docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                       exec -T nginx wget -qO- http://web_$ACTIVE:3000/ > /dev/null 2>&1; then
+                    echo "   ✅ nginx CAN reach web_$ACTIVE directly — routing works at the network level, so this is proxy config/SSL, not DNS."
+                  else
+                    echo "   ❌ nginx CANNOT reach web_$ACTIVE at all — DNS/network problem between the nginx and web_$ACTIVE containers, not a config issue."
+                  fi
+
+                  echo ""
+                  echo "── Diagnostics: active backend pointer nginx is actually using ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    exec -T nginx cat /etc/nginx/active/web-backend.conf
+
+                  echo ""
+                  echo "── Diagnostics: last 50 log lines from nginx ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    logs --tail=50 nginx
+                else
+                  echo "   ❌ App does NOT respond on :3000 inside its own container — the app itself is failing to boot."
+                  echo ""
+                  echo "── Diagnostics: last 100 log lines from web_$ACTIVE ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    logs --tail=100 web_$ACTIVE
+                fi
 
                 exit 1
               fi
@@ -193,4 +215,3 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
-          
