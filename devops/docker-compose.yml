@@ -92,7 +92,12 @@ services:
       target: development
     container_name: nityasamagri_api
     restart: unless-stopped
-    env_file: ./backend/.env
+    # Relative paths in a merged `docker compose -f a -f b` run resolve
+    # against the *first* file's directory (devops/ for every invocation
+    # in this repo's deploy scripts), not this file's own location — so
+    # this must go up one level to reach the real <repo root>/backend/.env,
+    # same as api_blue/api_green already do correctly in docker-compose.prod.yml.
+    env_file: ../backend/.env
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-nityasamagri_dev}@postgres:5432/nityasamagri
       REDIS_HOST:   redis
@@ -190,5 +195,3 @@ services:
       - postgres
     profiles:
       - tools
-
-      

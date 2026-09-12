@@ -109,6 +109,16 @@ services:
     entrypoint: ["/bin/sh", "-c"]
 
   nginx:
+    # Overrides the base file's `depends_on: [web, api]` — those are the
+    # dev-only bare services (built with target: development), which don't
+    # run in production at all and shouldn't be part of nginx's graph here.
+    # Deploy order in prod is already handled explicitly, service-by-service,
+    # by the deploy workflows (deploy-web.yml, deploy-api.yml,
+    # deploy-scheduled.yml) — see the IMPORTANT note above. Leaving the old
+    # depends_on in place meant any problem with the dev api/web services'
+    # config (e.g. a bad relative path) could block nginx from starting in
+    # prod even though prod never uses those services.
+    depends_on: []
     volumes:
       - ../docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ../docker/nginx/active:/etc/nginx/active
