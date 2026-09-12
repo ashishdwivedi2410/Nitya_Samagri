@@ -134,6 +134,29 @@ jobs:
                            -f devops/docker-compose.prod.yml \
                            up -d --no-deps web_$ACTIVE
 
+            # nginx is persistent shared infrastructure — this workflow only
+            # ever touches web_$ACTIVE (--no-deps), it never starts or stops
+            # nginx. But if nginx isn't running for any reason, NOTHING is
+            # reachable publicly no matter how healthy web_$ACTIVE is, and
+            # the health-check loop below would fail all 6 attempts every
+            # time — 48s wasted on a check that was doomed from attempt 1.
+            # Catch that up front and try to self-heal before waiting at all.
+            if ! docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                   ps nginx --status running | grep -q nginx; then
+              echo "⚠️  nginx is not running — attempting to start it."
+              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                up -d --no-deps nginx
+              sleep 5
+              if ! docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                     ps nginx --status running | grep -q nginx; then
+                echo "❌ nginx still isn't running after attempting to start it."
+                echo "   This is outside what this deploy script can fix automatically —"
+                echo "   check certs/config on the server directly: docker compose logs nginx"
+                exit 1
+              fi
+              echo "✅ nginx is now running."
+            fi
+
             # A single curl right after `up -d` races the container's own
             # startup — compose reports "Started" as soon as the process
             # launches, not once Next.js is actually accepting connections
