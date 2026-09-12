@@ -134,8 +134,27 @@ jobs:
                            -f devops/docker-compose.prod.yml \
                            up -d --no-deps web_$ACTIVE
 
-            sleep 10
-            curl -sf https://nityasamagri.in || exit 1
+            # A single curl right after `up -d` races the container's own
+            # startup — compose reports "Started" as soon as the process
+            # launches, not once Next.js is actually accepting connections
+            # (the image's own HEALTHCHECK gives it a 30s start-period for
+            # exactly this reason). A lone `sleep 10; curl ... || exit 1`
+            # was failing the whole deploy on a container that was simply
+            # still coming up. Retry instead of failing on the first miss.
+            echo "Waiting for web_$ACTIVE to come up healthy..."
+            for attempt in 1 2 3 4 5 6; do
+              sleep 8
+              if curl -sf --max-time 10 https://nityasamagri.in > /dev/null; then
+                echo "✅ Health check passed (attempt $attempt/6)."
+                break
+              fi
+              if [ "$attempt" -eq 6 ]; then
+                echo "❌ Health check failed after 6 attempts (~48s) — deploy did not come up healthy."
+                exit 1
+              fi
+              echo "⏳ Health check attempt $attempt/6 failed, retrying..."
+            done
+
             docker image prune -f
             echo "✅ Customer web deployed (color: $ACTIVE)!"
         env:
