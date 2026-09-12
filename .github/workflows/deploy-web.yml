@@ -138,9 +138,14 @@ jobs:
             # startup — compose reports "Started" as soon as the process
             # launches, not once Next.js is actually accepting connections
             # (the image's own HEALTHCHECK gives it a 30s start-period for
-            # exactly this reason). A lone `sleep 10; curl ... || exit 1`
-            # was failing the whole deploy on a container that was simply
-            # still coming up. Retry instead of failing on the first miss.
+            # exactly this reason). Retry instead of failing on the first miss.
+            #
+            # NOTE: a slow-start race would eventually pass within the 48s
+            # window below. If it fails all 6/6 attempts, that's not a race
+            # any more — the container itself isn't coming up, or nginx
+            # isn't routing to it. On final failure, isolate which of those
+            # it is (internal check bypassing nginx/SSL entirely) and dump
+            # the container's own logs, instead of failing with no evidence.
             echo "Waiting for web_$ACTIVE to come up healthy..."
             for attempt in 1 2 3 4 5 6; do
               sleep 8
@@ -150,6 +155,25 @@ jobs:
               fi
               if [ "$attempt" -eq 6 ]; then
                 echo "❌ Health check failed after 6 attempts (~48s) — deploy did not come up healthy."
+                echo ""
+                echo "── Diagnostics: container status ──"
+                docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                  ps web_$ACTIVE
+
+                echo ""
+                echo "── Diagnostics: internal check (bypasses nginx/SSL/DNS) ──"
+                if docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                     exec -T web_$ACTIVE wget -qO- http://localhost:3000/ > /dev/null 2>&1; then
+                  echo "   ✅ App responds on :3000 inside its own container — the app is fine, this is an nginx/DNS/SSL routing problem."
+                else
+                  echo "   ❌ App does NOT respond on :3000 inside its own container — the app itself is failing to boot. See logs below."
+                fi
+
+                echo ""
+                echo "── Diagnostics: last 100 log lines from web_$ACTIVE ──"
+                docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                  logs --tail=100 web_$ACTIVE
+
                 exit 1
               fi
               echo "⏳ Health check attempt $attempt/6 failed, retrying..."
@@ -169,3 +193,4 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
+          
