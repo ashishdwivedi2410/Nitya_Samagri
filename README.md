@@ -647,7 +647,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 - **Email:** support@nityasamagri.in
 - **Phone:** +91 8595427053
 - **WhatsApp:** +91 8595427053
-- **Location:** Mohali, Punjab, India
+- **Location:** Noida, Uttar Pradesh, India
 ---
  
 <div align="center">
