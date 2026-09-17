@@ -1,0 +1,240 @@
+name: 🌐 Deploy Customer Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/deploy-web.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+
+env:
+  REGISTRY:   docker.io
+  IMAGE_NAME: nityasamagri/web
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Quality Check ────────────────────────────────────────────────────────────
+  quality:
+    name: 🔍 Type Check & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL:      https://api.adminns.in/api/v1
+          NEXT_PUBLIC_WS_URL:       wss://api.adminns.in/ws
+          NEXT_PUBLIC_RAZORPAY_KEY: ${{ secrets.RAZORPAY_KEY_ID }}
+
+  # ── Build & Push Docker Image ─────────────────────────────────────────────────
+  build:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: quality
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context:  .
+          file:     ./apps/web/Dockerfile
+          target:   production
+          push:     true
+          tags:     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.adminns.in/api/v1
+            NEXT_PUBLIC_WS_URL=wss://api.adminns.in/ws
+            NEXT_PUBLIC_RAZORPAY_KEY=${{ secrets.RAZORPAY_KEY_ID }}
+            NEXT_PUBLIC_APP_URL=https://nityasamagri.in
+
+  # ── Deploy to Lightsail ───────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to Lightsail
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://nityasamagri.in
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          envs:     NEW_TAG
+          script: |
+            set -e
+            cd ~/Nitya_Samagri
+            git pull origin main
+
+            # Production only knows web_blue / web_green (see
+            # docker-compose.prod.yml) — there's no bare "web" service.
+            # This workflow deploys just the web app, so rather than doing
+            # a full blue/green swap (which would also have to flip the
+            # shared .active_color file that deploy-scheduled.yml uses to
+            # keep api/web/admin in sync), it updates whichever color is
+            # already live, in place.
+            ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
+            echo "Currently live color: $ACTIVE — updating web_$ACTIVE in place."
+
+            # docker pull occasionally fails mid-layer-download against Docker Hub
+            # (transient registry hiccup / partial blob), which aborts the whole
+            # deploy under `set -e` before the tag/compose/curl steps ever run.
+            # Retry a few times with backoff before giving up for real.
+            PULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG"
+            for attempt in 1 2 3 4 5; do
+              echo "Pulling $PULL_IMAGE (attempt $attempt/5)..."
+              if docker pull "$PULL_IMAGE"; then
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                echo "❌ docker pull failed after 5 attempts — aborting deploy."
+                exit 1
+              fi
+              sleep $((attempt * 5))
+            done
+
+            docker tag  "$PULL_IMAGE" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
+
+            docker compose -f devops/docker-compose.yml \
+                           -f devops/docker-compose.prod.yml \
+                           up -d --no-deps web_$ACTIVE
+
+            # nginx is persistent shared infrastructure — this workflow only
+            # ever touches web_$ACTIVE (--no-deps), it never starts or stops
+            # nginx. But if nginx isn't running for any reason, NOTHING is
+            # reachable publicly no matter how healthy web_$ACTIVE is, and
+            # the health-check loop below would fail all 6 attempts every
+            # time — 48s wasted on a check that was doomed from attempt 1.
+            # Catch that up front and try to self-heal before waiting at all.
+            if ! docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                   ps nginx --status running | grep -q nginx; then
+              echo "⚠️  nginx is not running — attempting to start it."
+              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                up -d --no-deps nginx
+              sleep 5
+              if ! docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                     ps nginx --status running | grep -q nginx; then
+                echo "❌ nginx still isn't running after attempting to start it."
+                echo "   This is outside what this deploy script can fix automatically —"
+                echo "   check certs/config on the server directly: docker compose logs nginx"
+                exit 1
+              fi
+              echo "✅ nginx is now running."
+            fi
+
+            # A single curl right after `up -d` races the container's own
+            # startup — compose reports "Started" as soon as the process
+            # launches, not once Next.js is actually accepting connections
+            # (the image's own HEALTHCHECK gives it a 30s start-period for
+            # exactly this reason). Retry instead of failing on the first miss.
+            #
+            # NOTE: a slow-start race would eventually pass within the 48s
+            # window below. If it fails all 6/6 attempts, that's not a race
+            # any more — the container itself isn't coming up, or nginx
+            # isn't routing to it. On final failure, isolate which of those
+            # it is (internal check bypassing nginx/SSL entirely) and dump
+            # the container's own logs, instead of failing with no evidence.
+            echo "Waiting for web_$ACTIVE to come up healthy..."
+            for attempt in 1 2 3 4 5 6; do
+              sleep 8
+              if curl -sf --max-time 10 https://nityasamagri.in > /dev/null; then
+                echo "✅ Health check passed (attempt $attempt/6)."
+                break
+              fi
+              if [ "$attempt" -eq 6 ]; then
+                echo "❌ Health check failed after 6 attempts (~48s) — deploy did not come up healthy."
+                echo ""
+                echo "── Diagnostics: container status ──"
+                docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                  ps web_$ACTIVE
+
+                echo ""
+                echo "── Diagnostics: internal check (bypasses nginx/SSL/DNS) ──"
+                if docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                     exec -T web_$ACTIVE wget -qO- http://localhost:3000/ > /dev/null 2>&1; then
+                  echo "   ✅ App responds on :3000 inside its own container — the app is fine, this is an nginx-side routing problem."
+                  echo ""
+                  echo "── Diagnostics: nginx container status ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    ps nginx
+
+                  echo ""
+                  echo "── Diagnostics: can nginx itself reach web_$ACTIVE over the docker network? ──"
+                  if docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                       exec -T nginx wget -qO- http://web_$ACTIVE:3000/ > /dev/null 2>&1; then
+                    echo "   ✅ nginx CAN reach web_$ACTIVE directly — routing works at the network level, so this is proxy config/SSL, not DNS."
+                  else
+                    echo "   ❌ nginx CANNOT reach web_$ACTIVE at all — DNS/network problem between the nginx and web_$ACTIVE containers, not a config issue."
+                  fi
+
+                  echo ""
+                  echo "── Diagnostics: active backend pointer nginx is actually using ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    exec -T nginx cat /etc/nginx/active/web-backend.conf
+
+                  echo ""
+                  echo "── Diagnostics: last 50 log lines from nginx ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    logs --tail=50 nginx
+                else
+                  echo "   ❌ App does NOT respond on :3000 inside its own container — the app itself is failing to boot."
+                  echo ""
+                  echo "── Diagnostics: last 100 log lines from web_$ACTIVE ──"
+                  docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+                    logs --tail=100 web_$ACTIVE
+                fi
+
+                exit 1
+              fi
+              echo "⏳ Health check attempt $attempt/6 failed, retrying..."
+            done
+
+            docker image prune -f
+            echo "✅ Customer web deployed (color: $ACTIVE)!"
+        env:
+          NEW_TAG: ${{ github.sha }}
+
+      - name: Smoke test
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+        env:
+          SKIP_API:                "1"
+          SKIP_ADMIN:              "1"
+          SMOKE_TEST_RETRIES:      "6"
+          SMOKE_TEST_RETRY_DELAY:  "8"

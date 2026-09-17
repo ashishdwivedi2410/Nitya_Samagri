@@ -1,0 +1,32 @@
+# NEW: no monitoring stack existed in the original app — maintenance.yml
+# only did ad-hoc curl-based health checks on a daily cron. This is a
+# minimal Prometheus + Grafana starting point; wire up real scrape targets
+# in prometheus.yml before relying on it.
+#
+# Run: docker compose -f monitoring/docker-compose.monitoring.yml up -d
+
+version: "3.9"
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3003:3000"
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

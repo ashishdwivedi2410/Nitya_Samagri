@@ -3,19 +3,21 @@
 # scripts/smoke-test.sh
 #
 # Verifies production is actually serving traffic after a deploy or
-# rollback. Checks the API health endpoint, the customer storefront, and
-# the admin panel — each independently skippable, since the single-service
-# workflows (deploy-api.yml, deploy-web.yml, deploy-admin.yml) only touch
-# one of the three and shouldn't fail on the other two being untouched/down
-# for unrelated reasons.
+# rollback. Checks the API health endpoint, the customer storefront, the
+# admin panel, and the chatbot service — each independently skippable,
+# since the single-service workflows (backend.yml, frontend.yml, admin.yml,
+# chatbot.yml) only touch one of the four and shouldn't fail on the others
+# being untouched/down for unrelated reasons.
 #
 # Env vars:
-#   SKIP_API / SKIP_WEB / SKIP_ADMIN   - set to "1" to skip that check
+#   SKIP_API / SKIP_WEB / SKIP_ADMIN / SKIP_CHATBOT - set to "1" to skip that check
 #   SMOKE_TEST_RETRIES                 - attempts per check (default 5)
 #   SMOKE_TEST_RETRY_DELAY             - seconds between attempts (default 5)
-#   API_HEALTH_URL / WEB_URL / ADMIN_URL
+#   API_HEALTH_URL / WEB_URL / ADMIN_URL / CHATBOT_HEALTH_URL
 #       - override the URL checked for that service
 #       - defaults are the production domains from DEPLOYMENT_GUIDE.md
+#       - CHATBOT_HEALTH_URL is NEW (chatbot service didn't exist in the
+#         original app); confirm it against the real deployed domain
 
 set -uo pipefail
 
@@ -25,6 +27,7 @@ DELAY="${SMOKE_TEST_RETRY_DELAY:-5}"
 API_HEALTH_URL="${API_HEALTH_URL:-https://api.adminns.in/health}"
 WEB_URL="${WEB_URL:-https://nityasamagri.in}"
 ADMIN_URL="${ADMIN_URL:-https://adminns.in}"
+CHATBOT_HEALTH_URL="${CHATBOT_HEALTH_URL:-https://chat.nityasamagri.in/health}"
 
 FAILED=0
 
@@ -68,6 +71,12 @@ if [ "${SKIP_ADMIN:-0}" = "1" ]; then
   echo "── Admin panel: skipped"
 else
   check "Admin panel" "$ADMIN_URL" || FAILED=1
+fi
+
+if [ "${SKIP_CHATBOT:-0}" = "1" ]; then
+  echo "── Chatbot health: skipped"
+else
+  check "Chatbot health" "$CHATBOT_HEALTH_URL" '"status":"ok"' || FAILED=1
 fi
 
 echo ""

@@ -1,0 +1,59 @@
+name: 🔒 Security Scan
+
+# NEW: no equivalent existed in the original app (pr-checks.yml did lint/test
+# only, no dependency or container scanning). Runs weekly and on every PR.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"  # every Monday 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  dependency-audit:
+    name: 📦 Dependency Audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: [backend, apps/web, apps/admin, chatbot]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm audit
+        working-directory: ${{ matrix.workspace }}
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  secret-scan:
+    name: 🕵️ Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for committed secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  container-scan:
+    name: 🐳 Container Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image for scan
+        run: docker build -t scan-target:latest ./backend
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: scan-target:latest
+          severity: CRITICAL,HIGH
+          exit-code: "0"   # set to "1" to fail the build on findings

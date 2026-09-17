@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.staging.yml — Staging overrides
+#
+# NEW: no staging compose file existed in the original app (only dev and a
+# blue/green prod). This is a deliberately simpler single-instance version
+# of docker-compose.prod.yml's api/web/admin/chatbot services — staging
+# doesn't need blue/green zero-downtime deploys, just a stable, isolated
+# environment that mirrors prod's build targets and env shape.
+#
+# Run: docker compose -f docker-compose.dev.yml -f docker-compose.staging.yml <cmd>
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      target: production
+    env_file: ../../backend/.env.staging
+    environment:
+      NODE_ENV: staging
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-nityasamagri}:${MONGO_ROOT_PASSWORD:-nityasamagri_staging}@mongodb:27017/nityasamagri_staging?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      NODE_ENV: staging
+      NEXT_PUBLIC_API_URL: https://staging-api.nityasamagri.in
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../../apps/admin
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      NODE_ENV: staging
+      NEXT_PUBLIC_API_URL: https://staging-api.nityasamagri.in
+    restart: unless-stopped
+
+  # NEW: chatbot didn't exist in the original app. Path assumes it lives as
+  # a sibling to backend/apps at repo root — adjust `context` to match
+  # wherever nitya-samagri-chatbot actually gets checked out on the host.
+  chatbot:
+    build:
+      context: ../../chatbot
+      dockerfile: Dockerfile
+    env_file: ../../chatbot/.env.staging
+    environment:
+      NODE_ENV: staging
+    restart: unless-stopped
+
+  mongodb:
+    environment:
+      MONGO_INITDB_DATABASE: nityasamagri_staging
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped

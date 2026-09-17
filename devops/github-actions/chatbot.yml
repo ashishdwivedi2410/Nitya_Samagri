@@ -1,0 +1,106 @@
+name: 🤖 Deploy Chatbot
+
+# NEW: no equivalent existed in the original app. Modeled on backend.yml
+# (formerly deploy-api.yml). Assumes this pipeline lives in the
+# nitya-samagri-devops repo but triggers off changes pushed to the
+# nitya-samagri-chatbot repo/path — adjust `paths` and the checkout step
+# to match your actual repo layout (monorepo vs separate repo).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "chatbot/**"
+      - "github-actions/chatbot.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "chatbot/**"
+
+env:
+  REGISTRY:     docker.io
+  IMAGE_NAME:   nityasamagri/chatbot
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Lint & Type Check ─────────────────────────────────────────────────────
+  lint:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbot
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: chatbot/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint --if-present
+
+  # ── Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Test
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: chatbot
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: chatbot/package-lock.json
+
+      - run: npm ci
+      - run: npm test --if-present
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+
+  # ── Build & Push Docker image ────────────────────────────────────────────
+  build:
+    name: 🐳 Build & Push
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:latest -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./chatbot
+          docker push ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # ── Deploy ────────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to server
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd nitya-samagri-devops
+            docker compose -f docker/docker-compose.prod.yml pull chatbot
+            docker compose -f docker/docker-compose.prod.yml up -d chatbot
+            ./scripts/health-check.sh chatbot

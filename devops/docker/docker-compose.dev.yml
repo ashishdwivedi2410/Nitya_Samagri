@@ -10,31 +10,31 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mongo_data:
   redis_data:
   minio_data:
   nginx_logs:
 
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: nityasamagri_postgres
+  # ── MongoDB ─────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: nityasamagri_mongodb
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       nityasamagri
-      POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nityasamagri_dev}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-nityasamagri}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-nityasamagri_dev}
+      MONGO_INITDB_DATABASE:      nityasamagri
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mongo_data:/data/db
+      - ./docker/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
     ports:
-      - "5432:5432"
+      - "27017:27017"
     networks:
       - nityasamagri
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d nityasamagri"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -99,20 +99,19 @@ services:
     # same as api_blue/api_green already do correctly in docker-compose.prod.yml.
     env_file: ../backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-nityasamagri_dev}@postgres:5432/nityasamagri
+      MONGO_URI:    mongodb://${MONGO_ROOT_USER:-nityasamagri}:${MONGO_ROOT_PASSWORD:-nityasamagri_dev}@mongodb:27017/nityasamagri?authSource=admin
       REDIS_HOST:   redis
       REDIS_PORT:   6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-nityasamagri_redis}
       NODE_ENV:     development
     volumes:
       - ./backend/src:/app/src:ro
-      - ./backend/prisma:/app/prisma:ro
     ports:
       - "4000:4000"
     networks:
       - nityasamagri
     depends_on:
-      postgres:
+      mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -179,19 +178,22 @@ services:
       - web
       - api
 
-  # ── pgAdmin (DB GUI) ────────────────────────────────────────────────────────
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: nityasamagri_pgadmin
+  # ── Mongo Express (DB GUI) ──────────────────────────────────────────────────
+  mongo-express:
+    image: mongo-express:latest
+    container_name: nityasamagri_mongo_express
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL:    admin@nityasamagri.in
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER:-nityasamagri}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-nityasamagri_dev}
+      ME_CONFIG_MONGODB_SERVER:        mongodb
+      ME_CONFIG_BASICAUTH_USERNAME:    admin
+      ME_CONFIG_BASICAUTH_PASSWORD:    ${PGADMIN_PASSWORD:-admin}
     ports:
-      - "5050:80"
+      - "5050:8081"
     networks:
       - nityasamagri
     depends_on:
-      - postgres
+      - mongodb
     profiles:
       - tools
