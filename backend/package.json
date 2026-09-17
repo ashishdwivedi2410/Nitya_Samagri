@@ -7,16 +7,16 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts",
+    "migrate": "ts-node scripts/migrate.ts",
+    "seed": "ts-node src/database/seed.ts",
     "lint": "eslint src --ext .ts",
-    "pretest": "prisma generate",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "smoke": "ts-node scripts/smoke-test.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.14.0",
+    "mongoose": "^8.5.1",
+    "firebase-admin": "^12.3.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
@@ -35,8 +35,7 @@
     "uuid": "^10.0.0",
     "winston": "^3.13.0",
     "ws": "^8.17.1",
-    "zod": "^3.23.8",
-    "prisma": "^5.14.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

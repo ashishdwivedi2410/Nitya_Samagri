@@ -14,7 +14,7 @@ import { requireRole }        from "../middlewares/rbac.middleware";
 import { validate }           from "../middlewares/validate.middleware";
 import { logger }             from "../utils/logger";
 import { razorpayService }    from "./razorpay.service";
-import { shiprocketService }  from "./shiprocket.service";
+import { shiprocketService }  from "./eshopbox.service";
 import { emitOrderUpdate, emitToAdmins } from "../websocket/ws.server";
 import { sendSMS }            from "./twilio";
 

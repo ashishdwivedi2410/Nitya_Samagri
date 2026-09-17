@@ -13,7 +13,7 @@ module.exports = {
   },
   clearMocks: true,
   verbose: true,
-  // Route files pull in Prisma/Redis/Razorpay clients as a side effect of
+  // Route files pull in Mongoose/Redis/Razorpay clients as a side effect of
   // import, which can leave sockets/timers open — cap runtime so a hang
   // fails the job instead of stalling CI indefinitely.
   testTimeout: 15000,

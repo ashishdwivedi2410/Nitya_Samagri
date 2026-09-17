@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# backend/Dockerfile — Multi-stage production build for Node.js + Prisma
+# backend/Dockerfile — Multi-stage production build for Node.js + MongoDB
 #
 # Built from the REPO ROOT as build context (see .github/workflows/
 # deploy-api.yml), not from ./backend — package-lock.json lives at the
@@ -7,20 +7,24 @@
 # Every COPY below is therefore rooted at the monorepo root and nests build
 # output under backend/, mirroring the same fix applied to apps/web and
 # apps/admin's Dockerfiles.
+#
+# Updated: this app runs on MongoDB/Mongoose now, not PostgreSQL/Prisma —
+# every `prisma generate` / `prisma migrate deploy` step has been removed.
+# openssl is no longer needed either (it was only required for Prisma's
+# query engine binary), but libc6-compat stays since some native npm
+# packages still need it on alpine.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl openssl-dev
+RUN apk add --no-cache libc6-compat
 
 # ── Stage 2: Install dependencies ────────────────────────────────────────────
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/package.json
 RUN npm ci --workspace=backend --include-workspace-root --frozen-lockfile
-COPY backend/prisma ./backend/prisma/
-RUN npx prisma generate --schema=./backend/prisma/schema.prisma
 
 # ── Stage 3: Development ──────────────────────────────────────────────────────
 FROM base AS development
@@ -36,13 +40,7 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 WORKDIR /app/backend
-RUN npx prisma generate
 RUN npm run build
-# Remove dev dependencies. `prisma` (the CLI, distinct from the
-# @prisma/client runtime library) must be a real dependency — not a
-# devDependency — because entrypoint.sh below runs `npx prisma migrate
-# deploy` at container startup; pruning a devDependency here would make
-# every production container fail to boot. See package.json.
 RUN npm prune --omit=dev
 
 # ── Stage 5: Production ───────────────────────────────────────────────────────
@@ -53,7 +51,7 @@ ENV NODE_ENV=production
 ENV PORT=4000
 
 # Install only runtime system deps
-RUN apk add --no-cache openssl libc6-compat wget
+RUN apk add --no-cache libc6-compat wget
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs \
@@ -62,17 +60,31 @@ RUN addgroup --system --gid 1001 nodejs \
 # Copy built app
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules         ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/backend/dist         ./backend/dist
-COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma       ./backend/prisma
 COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json ./backend/package.json
 
 WORKDIR /app/backend
 
-# Entrypoint script: run migrations then start server
+# Entrypoint script: wait for MongoDB, run optional migrations, start server.
+# Kept inline here (rather than only devops/docker/entrypoints/api-entrypoint.sh)
+# so the image is self-contained and doesn't depend on the devops repo being
+# checked out alongside it at build time — the devops copy is the canonical
+# version if the two ever drift, this one should be kept in sync with it.
 COPY --chown=nodejs:nodejs <<'ENTRYPOINT_EOF' ./entrypoint.sh
 #!/bin/sh
 set -e
-echo "🔄 Running Prisma migrations..."
-npx prisma migrate deploy
+echo "⏳ Waiting for MongoDB..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+until node -e "require('mongoose').connect(process.env.MONGO_URI).then(()=>process.exit(0)).catch(()=>process.exit(1))" > /dev/null 2>&1; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
+    echo "❌ MongoDB did not become ready in time. Exiting."
+    exit 1
+  fi
+  sleep 2
+done
+echo "✅ MongoDB is ready"
+npm run migrate --if-present
 echo "🪔 Starting nityasamagri API..."
 exec "$@"
 ENTRYPOINT_EOF
