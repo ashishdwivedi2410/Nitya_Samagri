@@ -10,6 +10,7 @@ export interface IReview extends Document {
   title?: string;
   comment?: string;
   isVerifiedPurchase: boolean;
+  isApproved: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +25,7 @@ const reviewSchema = new Schema<IReview>(
     title: { type: String },
     comment: { type: String },
     isVerifiedPurchase: { type: Boolean, default: false },
+    isApproved: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

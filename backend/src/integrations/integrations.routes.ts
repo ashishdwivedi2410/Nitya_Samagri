@@ -1,369 +1,316 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/integrations/integrations.routes.ts
-// Shipping rate check, Shiprocket webhook, Razorpay checkout config
+// Shipping rate check, Eshopbox webhook, Razorpay checkout config
+//
+// Converted from Prisma/PostgreSQL to Mongoose/MongoDB, and from Shiprocket
+// to Eshopbox. Eshopbox is a managed 3PL (they run the warehouse and
+// assign couriers themselves), so routes that assumed Shiprocket's
+// self-service courier-selection/pickup-scheduling API
+// (/shipping/rates' per-courier list, /shipping/pickup, /shipping/ndr)
+// have been simplified or removed — see the comments on each route below.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
-import crypto  from "crypto";
-import { z }   from "zod";
-import { prisma }             from "../config/prisma";
-import { AppError }           from "../utils/AppError";
-import { asyncHandler }       from "../middlewares/async.middleware";
-import { authenticate }       from "../middlewares/auth.middleware";
-import { requireRole }        from "../middlewares/rbac.middleware";
-import { validate }           from "../middlewares/validate.middleware";
-import { logger }             from "../utils/logger";
-import { razorpayService }    from "./razorpay.service";
-import { shiprocketService }  from "./eshopbox.service";
+import crypto from "crypto";
+import { z } from "zod";
+import { Order } from "../database/models/Order";
+import { OrderTimeline } from "../database/models/OrderTimeline";
+import { User } from "../database/models/User";
+import { AppError } from "../utils/AppError";
+import { asyncHandler } from "../middlewares/async.middleware";
+import { authenticate } from "../middlewares/auth.middleware";
+import { requireRole } from "../middlewares/rbac.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import { logger } from "../utils/logger";
+import { razorpayService } from "./razorpay.service";
+import { eshopboxService } from "./eshopbox.service";
 import { emitOrderUpdate, emitToAdmins } from "../websocket/ws.server";
-import { sendSMS }            from "./twilio";
+import { sendSMS } from "./twilio";
 
 const router = Router();
 
 function safeCompareString(expected: string, actual: string): boolean {
   const expectedBuf = Buffer.from(expected, "utf8");
-  const actualBuf    = Buffer.from(actual,   "utf8");
+  const actualBuf = Buffer.from(actual, "utf8");
   if (expectedBuf.length !== actualBuf.length) return false;
   return crypto.timingSafeEqual(expectedBuf, actualBuf);
 }
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const ShippingRatesQuerySchema = z.object({
-  pincode:    z.string().regex(/^\d{6}$/, "Invalid pincode"),
-  weight:     z.coerce.number().positive().default(0.5),
+  pincode: z.string().regex(/^\d{6}$/, "Invalid pincode"),
+  weight: z.coerce.number().positive().default(0.5),
   orderValue: z.coerce.number().min(0).default(0),
-  cod:        z.enum(["true","false"]).default("false").transform(v => v === "true"),
+  cod: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 });
 
 const ShippingCreateSchema = z.object({
-  orderId:   z.string(),
-  courierId: z.number().optional(),
-});
-
-const ShippingPickupSchema = z.object({
-  shipmentIds: z.array(z.number()).min(1),
-});
-
-const ShippingNdrSchema = z.object({
-  awb:           z.string(),
-  action:        z.enum(["re-attempt","return"]),
-  reattemptDate: z.string().optional(),
-  remarks:       z.string().optional(),
+  orderId: z.string(),
 });
 
 // ── Shipping rate check (public) ──────────────────────────────────────────────
 
 /**
  * GET /api/v1/integrations/shipping/rates?pincode=110070&weight=0.5&orderValue=599
- * Returns available couriers and rates for a delivery pincode
+ *
+ * Simplified vs. the old Shiprocket version: Eshopbox has no public
+ * rate-shopping API to list multiple couriers, so this just returns the
+ * flat free-shipping-threshold rate from eshopboxService.calculateRate()
+ * instead of a per-courier comparison list.
  */
-router.get("/shipping/rates", validate(ShippingRatesQuerySchema, "query"), asyncHandler(async (req: Request, res: Response) => {
-  const q = req.query as unknown as z.infer<typeof ShippingRatesQuerySchema>;
-
-  const pickupPincode = process.env.PICKUP_PINCODE || "160055"; // Mohali warehouse
-
-  if (q.orderValue >= 499) {
-    return res.json({
-      success: true,
-      data: {
-        freeShipping: true,
-        shippingCharge: 0,
-        message: "Free delivery on this order!",
-        estimatedDays: "3-5 business days",
-      },
-    });
-  }
-
-  const couriers = await shiprocketService.getAvailableCouriers({
-    pickupPincode,
-    deliveryPincode: q.pincode,
-    weight:          q.weight,
-    cod:             q.cod,
-  });
-
-  const cheapest = couriers.sort((a, b) => a.rate - b.rate)[0];
-
-  res.json({
-    success: true,
-    data: {
-      freeShipping:    false,
-      shippingCharge:  cheapest?.rate || 49,
-      estimatedDays:   cheapest?.etd || "3-5 business days",
-      availableCouriers: couriers.slice(0, 3),
-    },
-  });
-}));
-
-/**
- * GET /api/v1/integrations/shipping/track/:awb
- * Track shipment by AWB number
- */
-router.get("/shipping/track/:awb", asyncHandler(async (req: Request, res: Response) => {
-  const { awb } = req.params;
-  if (!awb || awb.length < 5) throw new AppError("Invalid AWB number", 400);
-
-  const tracking = await shiprocketService.trackByAWB(awb);
-  res.json({ success: true, data: { tracking } });
-}));
-
-/**
- * POST /api/v1/integrations/shipping/create
- * Admin: create Shiprocket shipment for an order
- */
-router.post("/shipping/create",
-  authenticate, requireRole(["admin","super_admin","order_manager"]),
-  validate(ShippingCreateSchema),
+router.get(
+  "/shipping/rates",
+  validate(ShippingRatesQuerySchema, "query"),
   asyncHandler(async (req: Request, res: Response) => {
-    const { orderId, courierId } = req.body as z.infer<typeof ShippingCreateSchema>;
+    const q = req.query as unknown as z.infer<typeof ShippingRatesQuerySchema>;
 
-    const order = await prisma.order.findFirst({
-      where:   { orderId },
-      include: {
-        items:   { include: { product: true, variant: true } },
-        address: true,
-        user:    { select: { name: true, email: true, phone: true } },
-      },
-    });
-    if (!order) throw new AppError("Order not found", 404);
+    if (q.orderValue >= 499) {
+      return res.json({
+        success: true,
+        data: {
+          freeShipping: true,
+          shippingCharge: 0,
+          message: "Free delivery on this order!",
+          estimatedDays: "3-5 business days",
+        },
+      });
+    }
 
-    // Build Shiprocket payload
-    const srOrder = await shiprocketService.createOrder({
-      orderId:       order.orderId,
-      orderDate:     order.createdAt.toISOString(),
-      customer: {
-        name:    order.address.name,
-        email:   order.user.email || "",
-        phone:   order.address.phone,
-        address: order.address.line1,
-        address2: order.address.line2 || "",
-        city:    order.address.city,
-        state:   order.address.state,
-        pincode: order.address.pin,
-        country: order.address.country,
-      },
-      items: order.items.map(item => ({
-        name:          item.product.name,
-        sku:           item.product.sku,
-        units:         item.qty,
-        selling_price: item.price,
-        hsn:           item.product.hsnCode ? parseInt(item.product.hsnCode) : 0,
-      })),
-      paymentMethod: order.paymentMethod === "cod" ? "COD" : "Prepaid",
-      subTotal:      order.subtotal,
-      length:        20,  // cm — could be per-product in future
-      breadth:       15,
-      height:        10,
-      weight:        0.5, // kg — could be calculated from product weights
-    });
-
-    // Update order with AWB and courier
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        trackingNo:  srOrder.awb,
-        courierName: srOrder.courierName,
-        status:      "shipped",
-      },
-    });
-
-    await prisma.orderTimeline.create({
-      data: {
-        orderId: order.id,
-        status:  "shipped",
-        note:    `Shipped via ${srOrder.courierName} | AWB: ${srOrder.awb}`,
-        adminId: req.user!.userId,
-      },
-    });
-
-    // Notify customer via WebSocket + SMS
-    emitOrderUpdate({
-      userId:  order.userId,
-      orderId: order.orderId,
-      status:  "shipped",
-      data:    { trackingNo: srOrder.awb, courierName: srOrder.courierName },
-    });
-
-    sendSMS(
-      order.address.phone,
-      `Hi ${order.user.name}! Your order ${order.orderId} has been shipped via ${srOrder.courierName}. Track: ${srOrder.awb}`
-    ).catch(() => {});
+    const shippingCharge = await eshopboxService.calculateRate({ orderValue: q.orderValue });
 
     res.json({
       success: true,
       data: {
-        shiprocketOrderId: srOrder.shiprocketOrderId,
-        awb:               srOrder.awb,
-        courierName:       srOrder.courierName,
+        freeShipping: false,
+        shippingCharge,
+        estimatedDays: "3-5 business days",
       },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/integrations/shipping/track/:orderId
+ * Track shipment by your internal order ID (Eshopbox tracks by
+ * customerOrderNumber, not AWB — see eshopbox.service.ts).
+ */
+router.get(
+  "/shipping/track/:orderId",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { orderId } = req.params;
+    if (!orderId) throw new AppError("Invalid order ID", 400);
+
+    const tracking = await eshopboxService.trackByOrderId(orderId);
+    res.json({ success: true, data: { tracking } });
+  })
+);
+
+/**
+ * POST /api/v1/integrations/shipping/create
+ * Admin: hand an order off to Eshopbox for fulfillment.
+ */
+router.post(
+  "/shipping/create",
+  authenticate,
+  requireRole(["admin", "super_admin", "order_manager"]),
+  validate(ShippingCreateSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { orderId } = req.body as z.infer<typeof ShippingCreateSchema>;
+
+    const order = await Order.findOne({ orderId })
+      .populate("addressId")
+      .populate("userId", "name email phone");
+    if (!order) throw new AppError("Order not found", 404);
+
+    const address = order.addressId as any;
+    const user = order.userId as any;
+
+    const { OrderItem } = await import("../database/models/OrderItem");
+    const items = await OrderItem.find({ orderId: order._id });
+
+    const ebOrder = await eshopboxService.createOrder({
+      orderId: order.orderId,
+      orderDate: order.createdAt.toISOString(),
+      customer: {
+        name: address.fullName,
+        email: user.email || "",
+        phone: address.phone,
+        address: address.line1,
+        address2: address.line2 || "",
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        country: "IN",
+      },
+      items: items.map((item) => ({
+        name: item.productName,
+        sku: item.sku,
+        units: item.qty,
+        selling_price: item.price,
+      })),
+      paymentMethod: order.paymentMethod === "cod" ? "COD" : "Prepaid",
+      subTotal: order.subtotal,
+      length: 20,
+      breadth: 15,
+      height: 10,
+      weight: 0.5,
+    });
+
+    order.status = "confirmed";
+    await order.save();
+
+    await OrderTimeline.create({
+      orderId: order._id,
+      status: "confirmed",
+      note: `Handed off to Eshopbox for fulfillment | Eshopbox order: ${ebOrder.eshopboxOrderId}`,
+    });
+
+    emitOrderUpdate({
+      userId: String(order.userId),
+      orderId: order.orderId,
+      status: "confirmed",
+      data: { eshopboxOrderId: ebOrder.eshopboxOrderId },
+    });
+
+    sendSMS(
+      address.phone,
+      `Hi ${user.name}! Your order ${order.orderId} has been confirmed and handed to our fulfillment partner.`
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      data: { eshopboxOrderId: ebOrder.eshopboxOrderId },
     });
   })
 );
 
 /**
  * POST /api/v1/integrations/shipping/pickup
- * Admin: schedule pickup for shipments
+ * NOT APPLICABLE with Eshopbox — pickup scheduling is entirely internal to
+ * their fulfillment operation (see eshopbox.service.ts's schedulePickup()).
+ * Route kept only to return a clear error instead of a 404, in case
+ * anything still calls it.
  */
-router.post("/shipping/pickup",
-  authenticate, requireRole(["admin","super_admin","order_manager","warehouse"]),
-  validate(ShippingPickupSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { shipmentIds } = req.body as z.infer<typeof ShippingPickupSchema>;
-
-    const result = await shiprocketService.schedulePickup(shipmentIds);
-
-    res.json({
-      success: true,
-      data:    { pickup: result },
-      message: `Pickup scheduled for ${result.pickupDate} (${result.pickupSlot})`,
-    });
+router.post(
+  "/shipping/pickup",
+  authenticate,
+  requireRole(["admin", "super_admin", "order_manager", "warehouse"]),
+  asyncHandler(async (_req: Request, _res: Response) => {
+    throw new AppError(
+      "Pickup scheduling is handled internally by Eshopbox — this endpoint is not applicable",
+      501
+    );
   })
 );
 
 /**
  * POST /api/v1/integrations/shipping/ndr
- * Admin: handle Non-Delivery Report
+ * NOT APPLICABLE — Eshopbox handles non-delivery reports internally and
+ * notifies via webhook rather than exposing an action endpoint. Kept only
+ * to return a clear error.
  */
-router.post("/shipping/ndr",
-  authenticate, requireRole(["admin","super_admin","order_manager"]),
-  validate(ShippingNdrSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { awb, action, reattemptDate, remarks } = req.body as z.infer<typeof ShippingNdrSchema>;
-
-    await shiprocketService.handleNDR({ awb, action, reattemptDate, remarks });
-
-    // Update order status to NDR
-    const order = await prisma.order.findFirst({ where: { trackingNo: awb } });
-    if (order) {
-      await prisma.orderTimeline.create({
-        data: {
-          orderId: order.id,
-          status:  "NDR",
-          note:    `NDR action: ${action}${remarks ? ` — ${remarks}` : ""}`,
-          adminId: req.user!.userId,
-        },
-      });
-    }
-
-    res.json({ success: true, message: `NDR action "${action}" applied for AWB ${awb}` });
+router.post(
+  "/shipping/ndr",
+  authenticate,
+  requireRole(["admin", "super_admin", "order_manager"]),
+  asyncHandler(async (_req: Request, _res: Response) => {
+    throw new AppError("NDR actions are handled internally by Eshopbox — this endpoint is not applicable", 501);
   })
 );
 
-// ── Shiprocket Webhook ────────────────────────────────────────────────────────
+// ── Eshopbox Webhook ─────────────────────────────────────────────────────────
 
 /**
  * POST /api/v1/integrations/shipping/webhook
- * Receives real-time status updates from Shiprocket
+ * Receives real-time status updates from Eshopbox.
+ *
+ * ⚠️ Field names/status values here are best-effort — Eshopbox's exact
+ * webhook payload shape wasn't confirmed against their docs (see
+ * eshopbox.service.ts's confidence-level notes). Verify against a real
+ * webhook delivery from your workspace before relying on this in prod.
  */
-router.post("/shipping/webhook", asyncHandler(async (req: Request, res: Response) => {
-  const body = req.body as Record<string, unknown>;
+router.post(
+  "/shipping/webhook",
+  asyncHandler(async (req: Request, res: Response) => {
+    const body = req.body as Record<string, unknown>;
 
-  // Shiprocket doesn't sign its webhook payloads, so this endpoint has to
-  // authenticate the caller itself. Two layers, both optional individually
-  // but at least one is REQUIRED — if neither is configured we fail closed
-  // (reject everything) rather than fail open (accept everything), which is
-  // what happened before when SHIPROCKET_WEBHOOK_IPS was left unset.
-  //
-  // 1. Shared secret (primary, recommended) — set SHIPROCKET_WEBHOOK_SECRET
-  //    and configure the Shiprocket webhook URL as
-  //    .../shipping/webhook?secret=<the same value>. Unlike an IP check,
-  //    this can't be bypassed by spoofing the X-Forwarded-For header, which
-  //    this server doesn't currently validate against a trusted proxy chain.
-  // 2. IP allowlist (optional, defense-in-depth) — SHIPROCKET_WEBHOOK_IPS,
-  //    comma-separated. Enforced in addition to the secret if both are set.
-  const configuredSecret = process.env.SHIPROCKET_WEBHOOK_SECRET || "";
-  const allowedIPs = (process.env.SHIPROCKET_WEBHOOK_IPS || "")
-    .split(",").map(ip => ip.trim()).filter(Boolean);
-  const clientIP = (req.headers["x-forwarded-for"] as string || req.ip || "").split(",")[0].trim();
+    // Same fail-closed auth pattern as before: at least one of secret or IP
+    // allowlist MUST be configured, or the endpoint refuses everything.
+    const configuredSecret = process.env.ESHOPBOX_WEBHOOK_SECRET || "";
+    const clientIP = ((req.headers["x-forwarded-for"] as string) || req.ip || "").split(",")[0].trim();
 
-  if (!configuredSecret && allowedIPs.length === 0) {
-    logger.error(
-      "Shiprocket webhook rejected: neither SHIPROCKET_WEBHOOK_SECRET nor SHIPROCKET_WEBHOOK_IPS is configured, " +
-      "so this endpoint has no way to authenticate the caller. Set at least SHIPROCKET_WEBHOOK_SECRET to enable it."
-    );
-    return res.status(403).json({ error: "Webhook not configured" });
-  }
+    if (!configuredSecret) {
+      logger.error(
+        "Eshopbox webhook rejected: ESHOPBOX_WEBHOOK_SECRET is not configured, " +
+          "so this endpoint has no way to authenticate the caller."
+      );
+      return res.status(403).json({ error: "Webhook not configured" });
+    }
 
-  if (configuredSecret) {
     const providedSecret = (req.query.secret as string) || (req.headers["x-webhook-secret"] as string) || "";
     if (!providedSecret || !safeCompareString(configuredSecret, providedSecret)) {
-      logger.warn(`Shiprocket webhook rejected: invalid or missing secret (IP ${clientIP})`);
+      logger.warn(`Eshopbox webhook rejected: invalid or missing secret (IP ${clientIP})`);
       return res.status(403).json({ error: "Unauthorized" });
     }
-  }
 
-  if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
-    logger.warn(`Shiprocket webhook from unauthorized IP: ${clientIP}`);
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+    const event = eshopboxService.parseWebhook(body);
+    logger.info(`Eshopbox webhook: order=${event.orderId} Status=${event.status}`);
 
-  const event = shiprocketService.parseWebhook(body);
-  logger.info(`Shiprocket webhook: AWB=${event.awb} Status=${event.status}`);
+    const STATUS_MAP: Record<string, string> = {
+      CONFIRMED: "confirmed",
+      "READY TO SHIP": "ready_for_pickup",
+      SHIPPED: "shipped",
+      "OUT FOR DELIVERY": "out_for_delivery",
+      DELIVERED: "delivered",
+      RTO: "returned",
+      UNDELIVERED: "NDR",
+      CANCELLED: "cancelled",
+    };
 
-  // Status mapping from Shiprocket to internal statuses
-  const STATUS_MAP: Record<string, string> = {
-    "PICKUP SCHEDULED":    "confirmed",
-    "PICKUP GENERATED":    "ready_for_pickup",
-    "PICKED UP":           "shipped",
-    "IN TRANSIT":          "shipped",
-    "OUT FOR DELIVERY":    "out_for_delivery",
-    "DELIVERED":           "delivered",
-    "RTO INITIATED":       "returned",
-    "RTO DELIVERED":       "returned",
-    "UNDELIVERED":         "NDR",
-    "LOST":                "cancelled",
-  };
+    const internalStatus = STATUS_MAP[event.status.toUpperCase()];
 
-  const internalStatus = STATUS_MAP[event.status.toUpperCase()];
+    if (event.orderId && internalStatus) {
+      const order = await Order.findOne({ orderId: event.orderId });
 
-  if (event.awb && internalStatus) {
-    const order = await prisma.order.findFirst({ where: { trackingNo: event.awb } });
+      if (order) {
+        order.status = internalStatus as any;
+        if (event.awb) order.trackingNo = event.awb;
+        await order.save();
 
-    if (order) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data:  { status: internalStatus as any },
-      });
-
-      await prisma.orderTimeline.create({
-        data: {
-          orderId: order.id,
-          status:  internalStatus,
-          note:    `Shiprocket update: ${event.status}${event.location ? ` at ${event.location}` : ""}`,
-        },
-      });
-
-      // Real-time update to customer
-      emitOrderUpdate({
-        userId:  order.userId,
-        orderId: order.orderId,
-        status:  internalStatus,
-        data:    { location: event.location },
-      });
-
-      // SMS for key milestones
-      if (["out_for_delivery","delivered"].includes(internalStatus)) {
-        const user = await prisma.user.findUnique({
-          where:  { id: order.userId },
-          select: { phone: true, name: true },
+        await OrderTimeline.create({
+          orderId: order._id,
+          status: internalStatus,
+          note: `Eshopbox update: ${event.status}${event.location ? ` at ${event.location}` : ""}`,
         });
-        const msgs: Record<string, string> = {
-          out_for_delivery: `Hi ${user?.name}! Your nityasamagri order ${order.orderId} is out for delivery. Expect it today! 🚚`,
-          delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. 🙏 Thank you for shopping with nityasamagri!`,
-        };
-        if (user?.phone && msgs[internalStatus]) {
-          sendSMS(user.phone, msgs[internalStatus]).catch(() => {});
+
+        emitOrderUpdate({
+          userId: String(order.userId),
+          orderId: order.orderId,
+          status: internalStatus,
+          data: { location: event.location },
+        });
+
+        if (["out_for_delivery", "delivered"].includes(internalStatus)) {
+          const user = await User.findById(order.userId).select("phone name");
+          const msgs: Record<string, string> = {
+            out_for_delivery: `Hi ${user?.name}! Your nityasamagri order ${order.orderId} is out for delivery. Expect it today! 🚚`,
+            delivered: `Hi ${user?.name}! Your order ${order.orderId} has been delivered. 🙏 Thank you for shopping with nityasamagri!`,
+          };
+          if (user?.phone && msgs[internalStatus]) {
+            sendSMS(user.phone, msgs[internalStatus]).catch(() => {});
+          }
         }
+
+        emitToAdmins({
+          event: "ORDER_STATUS_UPDATE",
+          payload: { orderId: order.orderId, status: internalStatus, location: event.location },
+        });
       }
-
-      emitToAdmins({
-        event:   "ORDER_STATUS_UPDATE",
-        payload: { orderId: order.orderId, awb: event.awb, status: internalStatus, location: event.location },
-      });
     }
-  }
 
-  res.json({ status: "ok" });
-}));
+    res.json({ status: "ok" });
+  })
+);
 
 // ── Razorpay Utilities ────────────────────────────────────────────────────────
 
@@ -371,24 +318,27 @@ router.post("/shipping/webhook", asyncHandler(async (req: Request, res: Response
  * GET /api/v1/integrations/payment/config/:orderId
  * Get Razorpay checkout config for frontend
  */
-router.get("/payment/config/:orderId",
+router.get(
+  "/payment/config/:orderId",
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
-    const order = await prisma.order.findFirst({
-      where:   { orderId: req.params.orderId, userId: req.user!.userId },
-      include: { user: { select: { name: true, phone: true, email: true } } },
-    });
+    const order = await Order.findOne({ orderId: req.params.orderId, userId: req.user!.userId }).populate(
+      "userId",
+      "name phone email"
+    );
 
     if (!order) throw new AppError("Order not found", 404);
     if (order.paymentStatus === "paid") throw new AppError("Order already paid", 400);
     if (!order.razorpayOrderId) throw new AppError("Payment not initialized", 400);
 
+    const user = order.userId as any;
+
     const config = razorpayService.getCheckoutConfig({
-      orderId:  order.razorpayOrderId,
-      amount:   order.total,
-      name:     order.user.name,
-      phone:    order.user.phone,
-      email:    order.user.email || "",
+      orderId: order.razorpayOrderId,
+      amount: order.total,
+      name: user.name,
+      phone: user.phone,
+      email: user.email || "",
       orderRef: order.orderId,
     });
 
@@ -400,16 +350,17 @@ router.get("/payment/config/:orderId",
  * GET /api/v1/integrations/payment/status/:paymentId
  * Check payment status from Razorpay
  */
-router.get("/payment/status/:paymentId",
+router.get(
+  "/payment/status/:paymentId",
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
     const payment = await razorpayService.fetchPayment(req.params.paymentId);
     res.json({
       success: true,
       data: {
-        status:   payment.status,
-        method:   payment.method,
-        amount:   Number(payment.amount) / 100,
+        status: payment.status,
+        method: payment.method,
+        amount: Number(payment.amount) / 100,
         captured: payment.captured,
       },
     });
