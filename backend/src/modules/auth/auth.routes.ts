@@ -1,43 +1,43 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH MODULE  ·  auth.routes.ts + auth.controller.ts + auth.service.ts
-// Single file for brevity — split into 3 files in production
+// AUTH MODULE  ·  auth.routes.ts
+// Converted from Prisma/PostgreSQL to Mongoose/MongoDB, and OTP login moved
+// from Twilio+Redis-stored-code to Firebase Auth (client sends OTP via
+// Firebase, backend verifies the resulting ID token). Password login is
+// unchanged apart from the ORM swap.
 // ─────────────────────────────────────────────────────────────────────────────
-// TS may complain if @types/express isn't installed in some environments — ignore here
-// @ts-ignore
-import { Router, Request, Response, NextFunction } from "express";
-import bcrypt  from "bcryptjs";
-import jwt     from "jsonwebtoken";
-import { z }   from "zod";
-import { prisma }      from "../../config/prisma";
-import { redis }       from "../../config/redis";
-import { AppError }    from "../../utils/AppError";
+import { Router, Request, Response } from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+import { User } from "../../database/models/User";
+import { redis } from "../../config/redis";
+import { env } from "../../config/env";
+import { AppError } from "../../utils/AppError";
 import { asyncHandler } from "../../middlewares/async.middleware";
-import { validate }    from "../../middlewares/validate.middleware";
+import { validate } from "../../middlewares/validate.middleware";
 import { authenticate } from "../../middlewares/auth.middleware";
-import { sendSMS }     from "../../integrations/twilio";
+import { verifyOtpToken } from "../../config/firebase";
 
 const router = Router();
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
 const RegisterSchema = z.object({
-  name:     z.string().min(2).max(60),
-  phone:    z.string().regex(/^\+91[6-9]\d{9}$/, "Invalid Indian mobile number"),
-  email:    z.string().email().optional(),
+  name: z.string().min(2).max(60),
+  phone: z.string().regex(/^\+91[6-9]\d{9}$/, "Invalid Indian mobile number"),
+  email: z.string().email().optional(),
   password: z.string().min(8).max(72),
 });
 
 const LoginSchema = z.object({
-  phone:    z.string().regex(/^\+91[6-9]\d{9}$/),
+  phone: z.string().regex(/^\+91[6-9]\d{9}$/),
   password: z.string().min(1),
 });
 
-const OtpRequestSchema = z.object({
-  phone: z.string().regex(/^\+91[6-9]\d{9}$/),
-});
-
+// Client completes phone OTP entry via the Firebase client SDK and sends us
+// the resulting ID token — we no longer generate/store/verify a 6-digit
+// code ourselves (that was OtpRequestSchema/OtpVerifySchema's job before).
 const OtpVerifySchema = z.object({
-  phone: z.string().regex(/^\+91[6-9]\d{9}$/),
-  otp:   z.string().length(6),
+  idToken: z.string().min(1),
 });
 
 const RefreshSchema = z.object({
@@ -45,38 +45,19 @@ const RefreshSchema = z.object({
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const OTP_TTL_SECONDS         = 600;      // OTP validity — 10 min, matches otp:${phone} TTL below
-const MAX_OTP_VERIFY_ATTEMPTS = 5;        // failed verify attempts allowed before lockout
-const OTP_LOCKOUT_SECONDS     = 30 * 60;  // 30 min lockout after too many failed attempts
-
-const MAX_LOGIN_ATTEMPTS       = 5;       // failed password attempts allowed before lockout
-const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60; // rolling window failed attempts are counted over
-const LOGIN_LOCKOUT_SECONDS    = 15 * 60; // lockout duration once threshold is hit
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60;
+const LOGIN_LOCKOUT_SECONDS = 15 * 60;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
 function signTokens(userId: string, role: string) {
-  // @types/jsonwebtoken types `expiresIn` as `number | StringValue`, a strict
-  // template-literal union (e.g. "15m", "30d") rather than plain `string`.
-  // Env vars are always widened to `string` by TS, so assert them to the
-  // type jwt.sign expects — the runtime value is validated by the `ms`
-  // package inside jsonwebtoken itself either way.
-  const accessTokenExpiresIn = (process.env.JWT_EXPIRES_IN || "15m") as jwt.SignOptions["expiresIn"];
-  const refreshTokenExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN || "30d") as jwt.SignOptions["expiresIn"];
+  const accessTokenExpiresIn = env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"];
+  const refreshTokenExpiresIn = env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"];
 
-  const accessToken = jwt.sign(
-    { userId, role },
-    process.env.JWT_SECRET!,
-    { expiresIn: accessTokenExpiresIn }
-  );
-  const refreshToken = jwt.sign(
-    { userId, role, type: "refresh" },
-    process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: refreshTokenExpiresIn }
-  );
+  const accessToken = jwt.sign({ userId, role }, env.JWT_SECRET, { expiresIn: accessTokenExpiresIn });
+  const refreshToken = jwt.sign({ userId, role, type: "refresh" }, env.JWT_REFRESH_SECRET, {
+    expiresIn: refreshTokenExpiresIn,
+  });
   return { accessToken, refreshToken };
 }
 
@@ -84,255 +65,211 @@ function signTokens(userId: string, role: string) {
 
 /**
  * POST /api/v1/auth/register
- * Register with phone + password (OTP verification separate)
+ * Register with phone + password. Since OTP verification now happens via
+ * Firebase on the client, this no longer sends an OTP itself — the client
+ * is expected to run the Firebase phone-verification flow separately (or
+ * you can require /auth/otp/verify to be called right after this to mark
+ * the account verified).
  */
-router.post("/register", validate(RegisterSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { name, phone, email, password } = req.body;
+router.post(
+  "/register",
+  validate(RegisterSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { name, phone, email, password } = req.body;
 
-  const existing = await prisma.user.findUnique({ where: { phone } });
-  if (existing) throw new AppError("Phone number already registered", 409);
+    const existing = await User.findOne({ phone });
+    if (existing) throw new AppError("Phone number already registered", 409);
 
-  const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: {
+    const user = await User.create({
       name,
       phone,
       email,
-      password:    hashedPassword,
-      role:        "customer",
-      isVerified:  false,
+      password: hashedPassword,
+      role: "customer",
+      isVerified: false,
       loyaltyPoints: 100, // welcome bonus
-    },
-    select: { id: true, name: true, phone: true, email: true, role: true },
-  });
+    });
 
-  // Send OTP for phone verification
-  const otp = generateOTP();
-  await redis.setex(`otp:${phone}`, OTP_TTL_SECONDS, otp); // 10 min TTL
-  await sendSMS(phone, `Your nityasamagri verification OTP is ${otp}. Valid for 10 minutes.`);
-
-  res.status(201).json({
-    success: true,
-    message: "Registration successful. Please verify your phone number.",
-    data:    { user },
-  });
-}));
+    res.status(201).json({
+      success: true,
+      message: "Registration successful. Please verify your phone number.",
+      data: { user: { id: user._id, name: user.name, phone: user.phone, email: user.email, role: user.role } },
+    });
+  })
+);
 
 /**
  * POST /api/v1/auth/login
  * Password-based login
  */
-router.post("/login", validate(LoginSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { phone, password } = req.body;
+router.post(
+  "/login",
+  validate(LoginSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { phone, password } = req.body;
 
-  // Lockout check: too many recent failed attempts for this phone number
-  const lockKey = `login_lock:${phone}`;
-  const locked  = await redis.get(lockKey);
-  if (locked) {
-    const ttl = await redis.ttl(lockKey);
-    throw new AppError(
-      `Too many failed login attempts. Please try again in ${Math.max(1, Math.ceil(ttl / 60))} minute(s).`,
-      429
-    );
-  }
-
-  const failKey = `login_fails:${phone}`;
-
-  async function registerFailure(message = "Invalid credentials"): Promise<never> {
-    const fails = await redis.incr(failKey);
-    if (fails === 1) await redis.expire(failKey, LOGIN_ATTEMPT_WINDOW_SECONDS);
-
-    if (fails >= MAX_LOGIN_ATTEMPTS) {
-      await redis.setex(lockKey, LOGIN_LOCKOUT_SECONDS, "1");
-      await redis.del(failKey);
+    const lockKey = `login_lock:${phone}`;
+    const locked = await redis.get(lockKey);
+    if (locked) {
+      const ttl = await redis.ttl(lockKey);
       throw new AppError(
-        `Too many failed login attempts. Please try again in ${Math.ceil(LOGIN_LOCKOUT_SECONDS / 60)} minute(s).`,
+        `Too many failed login attempts. Please try again in ${Math.max(1, Math.ceil(ttl / 60))} minute(s).`,
         429
       );
     }
-    throw new AppError(message, 401);
-  }
 
-  const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) return registerFailure();
-  if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
+    const failKey = `login_fails:${phone}`;
 
-  // Accounts auto-registered via /auth/otp/verify have no password set.
-  // bcrypt.compare(password, null) throws, so check explicitly rather than
-  // letting that surface as a generic 500 — still routed through
-  // registerFailure() so probing phone numbers this way is rate-limited and
-  // lockable exactly like any other failed login attempt.
-  if (!user.password) {
-    return registerFailure("This account uses OTP login. Please log in with an OTP instead of a password.");
-  }
+    async function registerFailure(message = "Invalid credentials"): Promise<never> {
+      const fails = await redis.incr(failKey);
+      if (fails === 1) await redis.expire(failKey, LOGIN_ATTEMPT_WINDOW_SECONDS);
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return registerFailure();
+      if (fails >= MAX_LOGIN_ATTEMPTS) {
+        await redis.setex(lockKey, LOGIN_LOCKOUT_SECONDS, "1");
+        await redis.del(failKey);
+        throw new AppError(
+          `Too many failed login attempts. Please try again in ${Math.ceil(LOGIN_LOCKOUT_SECONDS / 60)} minute(s).`,
+          429
+        );
+      }
+      throw new AppError(message, 401);
+    }
 
-  // Success — clear any failed-attempt tracking for this phone
-  await redis.del(failKey);
-  await redis.del(lockKey);
+    const user = await User.findOne({ phone }).select("+password");
+    if (!user) return registerFailure();
+    if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
 
-  const { accessToken, refreshToken } = signTokens(user.id, user.role);
+    if (!user.password) {
+      return registerFailure("This account uses OTP login. Please log in with an OTP instead of a password.");
+    }
 
-  // Store refresh token in Redis
-  await redis.setex(`refresh:${user.id}`, 30 * 24 * 60 * 60, refreshToken);
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return registerFailure();
 
-  // Update last login
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await redis.del(failKey);
+    await redis.del(lockKey);
 
-  res.json({
-    success: true,
-    data: {
-      user:         { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role },
-      accessToken,
-      refreshToken,
-    },
-  });
-}));
+    const { accessToken, refreshToken } = signTokens(String(user._id), user.role);
+    await redis.setex(`refresh:${user._id}`, 30 * 24 * 60 * 60, refreshToken);
 
-/**
- * POST /api/v1/auth/otp/request
- * Request OTP (for OTP-based login or verification)
- */
-router.post("/otp/request", validate(OtpRequestSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { phone } = req.body;
+    user.lastLoginAt = new Date();
+    await user.save();
 
-  // Rate limit: max 3 OTP requests per 10 minutes per phone
-  const attempts = await redis.incr(`otp_attempts:${phone}`);
-  if (attempts === 1) await redis.expire(`otp_attempts:${phone}`, 600);
-  if (attempts > 3)   throw new AppError("Too many OTP requests. Try again in 10 minutes.", 429);
-
-  const otp = generateOTP();
-  await redis.setex(`otp:${phone}`, OTP_TTL_SECONDS, otp);
-  await sendSMS(phone, `Your nityasamagri OTP is ${otp}. Do not share it with anyone.`);
-
-  // Dev only: return OTP in response
-  const data: Record<string, unknown> = { message: "OTP sent successfully" };
-  if (process.env.NODE_ENV === "development") data.otp = otp;
-
-  res.json({ success: true, data });
-}));
+    res.json({
+      success: true,
+      data: {
+        user: { id: user._id, name: user.name, phone: user.phone, email: user.email, role: user.role },
+        accessToken,
+        refreshToken,
+      },
+    });
+  })
+);
 
 /**
  * POST /api/v1/auth/otp/verify
- * Verify OTP and return tokens (OTP login flow)
+ * Verify a Firebase phone-auth ID token and return our own JWT pair.
+ * Replaces the old { phone, otp } flow — the client now completes OTP
+ * entry via the Firebase client SDK and sends us the resulting idToken.
  */
-router.post("/otp/verify", validate(OtpVerifySchema), asyncHandler(async (req: Request, res: Response) => {
-  const { phone, otp } = req.body;
+router.post(
+  "/otp/verify",
+  validate(OtpVerifySchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { idToken } = req.body as z.infer<typeof OtpVerifySchema>;
 
-  // Lockout check: if this phone has failed too many verify attempts recently, block it
-  const lockKey = `otp_lock:${phone}`;
-  const locked  = await redis.get(lockKey);
-  if (locked) {
-    const ttl = await redis.ttl(lockKey);
-    throw new AppError(
-      `Too many failed attempts. Please try again in ${Math.max(1, Math.ceil(ttl / 60))} minute(s).`,
-      429
-    );
-  }
+    const { phone, firebaseUid } = await verifyOtpToken(idToken);
 
-  const storedOtp = await redis.get(`otp:${phone}`);
+    let user = await User.findOne({ phone });
+    const isNewUser = !user;
 
-  if (!storedOtp || storedOtp !== otp) {
-    // Track failed verify attempts per phone (max 5, then lock out)
-    const failKey = `otp_verify_fails:${phone}`;
-    const fails   = await redis.incr(failKey);
-    if (fails === 1) await redis.expire(failKey, OTP_TTL_SECONDS);
-
-    if (fails >= MAX_OTP_VERIFY_ATTEMPTS) {
-      // Lock the phone out and burn the current OTP so it can't keep being guessed
-      await redis.setex(lockKey, OTP_LOCKOUT_SECONDS, "1");
-      await redis.del(`otp:${phone}`);
-      await redis.del(failKey);
-      throw new AppError(
-        "Too many failed attempts. This OTP has been invalidated — please request a new one after the lockout period.",
-        429
-      );
+    if (!user) {
+      user = await User.create({
+        phone,
+        firebaseUid,
+        role: "customer",
+        isVerified: true,
+        loyaltyPoints: 100,
+        name: "New User",
+      });
+    } else {
+      user.isVerified = true;
+      user.firebaseUid = firebaseUid;
+      user.lastLoginAt = new Date();
+      await user.save();
     }
 
-    throw new AppError("Invalid or expired OTP", 400);
-  }
+    if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
 
-  // Success — clear OTP and all attempt/lockout tracking (one-time use)
-  await redis.del(`otp:${phone}`);
-  await redis.del(`otp_attempts:${phone}`);
-  await redis.del(`otp_verify_fails:${phone}`);
-  await redis.del(lockKey);
+    const { accessToken, refreshToken } = signTokens(String(user._id), user.role);
+    await redis.setex(`refresh:${user._id}`, 30 * 24 * 60 * 60, refreshToken);
 
-  let user = await prisma.user.findUnique({ where: { phone } });
-
-  // Auto-register if new user (phone-first onboarding)
-  if (!user) {
-    user = await prisma.user.create({
-      data: { phone, role: "customer", isVerified: true, loyaltyPoints: 100, name: "New User" },
+    res.json({
+      success: true,
+      data: {
+        user: { id: user._id, name: user.name, phone: user.phone, role: user.role },
+        accessToken,
+        refreshToken,
+        isNewUser,
+      },
     });
-  } else {
-    await prisma.user.update({ where: { id: user.id }, data: { isVerified: true, lastLoginAt: new Date() } });
-  }
-
-  const { accessToken, refreshToken } = signTokens(user.id, user.role);
-  await redis.setex(`refresh:${user.id}`, 30 * 24 * 60 * 60, refreshToken);
-
-  res.json({
-    success: true,
-    data: {
-      user:        { id: user.id, name: user.name, phone: user.phone, role: user.role },
-      accessToken,
-      refreshToken,
-      isNewUser:   !user.name || user.name === "New User",
-    },
-  });
-}));
+  })
+);
 
 /**
  * POST /api/v1/auth/refresh
  * Refresh access token using refresh token
  */
-router.post("/refresh", validate(RefreshSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+router.post(
+  "/refresh",
+  validate(RefreshSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { refreshToken } = req.body;
 
-  let decoded: { userId: string; role: string };
-  try {
-    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!, { algorithms: ["HS256"] }) as typeof decoded;
-  } catch {
-    throw new AppError("Invalid or expired refresh token", 401);
-  }
+    let decoded: { userId: string; role: string };
+    try {
+      decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET, { algorithms: ["HS256"] }) as typeof decoded;
+    } catch {
+      throw new AppError("Invalid or expired refresh token", 401);
+    }
 
-  const stored = await redis.get(`refresh:${decoded.userId}`);
-  if (!stored || stored !== refreshToken) throw new AppError("Refresh token revoked", 401);
+    const stored = await redis.get(`refresh:${decoded.userId}`);
+    if (!stored || stored !== refreshToken) throw new AppError("Refresh token revoked", 401);
 
-  const { accessToken, refreshToken: newRefreshToken } = signTokens(decoded.userId, decoded.role);
-  await redis.setex(`refresh:${decoded.userId}`, 30 * 24 * 60 * 60, newRefreshToken);
+    const { accessToken, refreshToken: newRefreshToken } = signTokens(decoded.userId, decoded.role);
+    await redis.setex(`refresh:${decoded.userId}`, 30 * 24 * 60 * 60, newRefreshToken);
 
-  res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
-}));
+    res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
+  })
+);
 
 /**
  * POST /api/v1/auth/logout
- * Invalidate refresh token
  */
-router.post("/logout", authenticate, asyncHandler(async (req: Request, res: Response) => {
-  await redis.del(`refresh:${req.user!.userId}`);
-  res.json({ success: true, message: "Logged out successfully" });
-}));
+router.post(
+  "/logout",
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    await redis.del(`refresh:${req.user!.userId}`);
+    res.json({ success: true, message: "Logged out successfully" });
+  })
+);
 
 /**
  * GET /api/v1/auth/me
- * Get current user profile
  */
-router.get("/me", authenticate, asyncHandler(async (req: Request, res: Response) => {
-  const user = await prisma.user.findUnique({
-    where:  { id: req.user!.userId },
-    select: {
-      id: true, name: true, phone: true, email: true,
-      role: true, isVerified: true, loyaltyPoints: true,
-      loyaltyTier: true, createdAt: true, lastLoginAt: true,
-    },
-  });
-  if (!user) throw new AppError("User not found", 404);
-  res.json({ success: true, data: { user } });
-}));
+router.get(
+  "/me",
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const user = await User.findById(req.user!.userId).select(
+      "name phone email role isVerified loyaltyPoints loyaltyTier createdAt lastLoginAt"
+    );
+    if (!user) throw new AppError("User not found", 404);
+    res.json({ success: true, data: { user } });
+  })
+);
 
 export default router;

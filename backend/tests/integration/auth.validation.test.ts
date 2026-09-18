@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "../../src/app";
 
 // These only exercise the validate() middleware in front of each route —
-// invalid input is rejected before the handler ever touches Prisma or Redis,
+// invalid input is rejected before the handler ever touches Mongo or Redis,
 // so no database/cache needs to be running for these to pass.
 
 describe("POST /api/v1/auth/register", () => {

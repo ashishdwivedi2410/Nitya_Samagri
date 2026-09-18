@@ -9,6 +9,7 @@ import { rateLimit } from "express-rate-limit";
 import { errorHandler } from "./middlewares/error.middleware";
 import { notFound }     from "./middlewares/notFound.middleware";
 import { logger }       from "./utils/logger";
+import { env }          from "./config/env";
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 import authRoutes         from "./modules/auth/auth.routes";
@@ -26,7 +27,7 @@ const app = express();
 // ── Security & Middleware ─────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin:      process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:3000"],
+  origin:      env.ALLOWED_ORIGINS,
   credentials: true,
 }));
 app.use(compression());

@@ -4,7 +4,7 @@ import { mockRedisInstance } from "../mocks/ioredis.mock";
 
 describe("GET /api/v1/products", () => {
   it("rejects a non-numeric page param with 400", async () => {
-    // Validation runs before any Redis/Prisma call, so this needs no mocking.
+    // Validation runs before any Redis/Mongo call, so this needs no mocking.
     const res = await request(app).get("/api/v1/products?page=abc");
 
     expect(res.status).toBe(400);
@@ -29,7 +29,7 @@ describe("GET /api/v1/products", () => {
 
     // Prime the mock Redis client with a "cache hit" for the very first
     // GET this test file makes; the route should short-circuit and never
-    // reach Prisma.
+    // reach the database.
     mockRedisInstance.get.mockResolvedValueOnce(JSON.stringify(cached));
 
     const res = await request(app).get("/api/v1/products");

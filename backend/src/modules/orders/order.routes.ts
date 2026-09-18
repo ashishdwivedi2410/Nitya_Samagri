@@ -1,126 +1,116 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ORDERS MODULE  ·  order.routes.ts
+// Converted from Prisma/PostgreSQL to Mongoose/MongoDB. sendgrid → mail.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router, Request, Response } from "express";
-import { z }   from "zod";
-import { Prisma }        from "@prisma/client";
-import { prisma }        from "../../config/prisma";
-import { AppError }      from "../../utils/AppError";
-import { asyncHandler }  from "../../middlewares/async.middleware";
-import { authenticate }  from "../../middlewares/auth.middleware";
-import { requireRole }   from "../../middlewares/rbac.middleware";
-import { validate }      from "../../middlewares/validate.middleware";
-import { paginate }      from "../../utils/paginate";
+import { z } from "zod";
+import mongoose, { ClientSession } from "mongoose";
+import { Order } from "../../database/models/Order";
+import { OrderItem } from "../../database/models/OrderItem";
+import { OrderTimeline } from "../../database/models/OrderTimeline";
+import { Address } from "../../database/models/Address";
+import { Product } from "../../database/models/Product";
+import { ProductVariant } from "../../database/models/ProductVariant";
+import { Coupon } from "../../database/models/Coupon";
+import { User } from "../../database/models/User";
+import { AppError } from "../../utils/AppError";
+import { asyncHandler } from "../../middlewares/async.middleware";
+import { authenticate } from "../../middlewares/auth.middleware";
+import { requireRole } from "../../middlewares/rbac.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import { paginate } from "../../utils/paginate";
 import { emitOrderUpdate, emitToAdmins } from "../../websocket/ws.server";
-import { sendSMS }       from "../../integrations/twilio";
-import { sendEmail }     from "../../integrations/sendgrid";
-import { logger }        from "../../utils/logger";
+import { sendSMS } from "../../integrations/twilio";
+import { sendEmail } from "../../integrations/mail";
+import { logger } from "../../utils/logger";
 
 const router = Router();
-
-type PrismaTx = Prisma.TransactionClient;
+const objectId = () => z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid ID");
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const CreateOrderSchema = z.object({
-  items: z.array(z.object({
-    productId: z.string().uuid(),
-    variantId: z.string().uuid().optional(),
-    qty:       z.number().int().min(1),
-    // NOTE: intentionally no `price` field — price is always looked up
-    // server-side from the Product/ProductVariant record, never trusted
-    // from the client. See order creation handler below.
-  })).min(1),
-  addressId:       z.string().uuid(),
-  deliveryDate:    z.string().datetime().optional(),
-  deliverySlot:    z.string().optional(),
-  couponCode:      z.string().optional(),
-  paymentMethod:   z.enum(["razorpay","upi","cod","card","netbanking","wallet"]),
-  notes:           z.string().max(500).optional(),
+  items: z
+    .array(
+      z.object({
+        productId: objectId(),
+        variantId: objectId().optional(),
+        qty: z.number().int().min(1),
+      })
+    )
+    .min(1),
+  addressId: objectId(),
+  deliveryDate: z.string().datetime().optional(),
+  deliverySlot: z.string().optional(),
+  couponCode: z.string().optional(),
+  paymentMethod: z.enum(["razorpay", "upi", "cod", "card", "netbanking", "wallet"]),
+  notes: z.string().max(500).optional(),
 });
 
 const UpdateStatusSchema = z.object({
-  status:  z.enum(["confirmed","packed","ready_for_pickup","shipped","out_for_delivery","delivered","cancelled","returned","refunded"]),
-  trackingNo:   z.string().optional(),
-  courierName:  z.string().optional(),
-  note:         z.string().optional(),
+  status: z.enum([
+    "confirmed", "packed", "ready_for_pickup", "shipped", "out_for_delivery",
+    "delivered", "cancelled", "returned", "refunded",
+  ]),
+  trackingNo: z.string().optional(),
+  courierName: z.string().optional(),
+  note: z.string().optional(),
 });
 
 const MyOrdersQuerySchema = z.object({
-  page:   z.coerce.number().min(1).default(1),
-  limit:  z.coerce.number().min(1).max(50).default(10),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(50).default(10),
   status: z.string().optional(),
 });
 
 const AdminOrdersQuerySchema = z.object({
-  page:      z.coerce.number().min(1).default(1),
-  limit:     z.coerce.number().min(1).max(100).default(20),
-  status:    z.string().optional(),
-  payment:   z.string().optional(),
-  q:         z.string().optional(),
-  dateFrom:  z.string().optional(),
-  dateTo:    z.string().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  status: z.string().optional(),
+  payment: z.string().optional(),
+  q: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 });
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending:           "Pending",
-  confirmed:         "Confirmed",
-  packed:            "Packed",
-  ready_for_pickup:  "Ready for Pickup",
-  shipped:           "Shipped",
-  out_for_delivery:  "Out for Delivery",
-  delivered:         "Delivered",
-  cancelled:         "Cancelled",
-  returned:          "Returned",
-  refunded:          "Refunded",
+  pending: "Pending", confirmed: "Confirmed", packed: "Packed",
+  ready_for_pickup: "Ready for Pickup", shipped: "Shipped",
+  out_for_delivery: "Out for Delivery", delivered: "Delivered",
+  cancelled: "Cancelled", returned: "Returned", refunded: "Refunded",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function generateOrderId(): string {
-  const year  = new Date().getFullYear();
-  const rand  = Math.floor(10000 + Math.random() * 90000);
+  const year = new Date().getFullYear();
+  const rand = Math.floor(10000 + Math.random() * 90000);
   return `ORD-${year}-${rand}`;
 }
-
-// generateOrderId() has no uniqueness check before insert — a collision is
-// rare but not impossible (90k possible suffixes per year). Order creation
-// retries with a freshly generated ID on that specific failure, up to this
-// many attempts, rather than surfacing a raw 500 to the customer.
 const MAX_ORDER_ID_ATTEMPTS = 5;
-
 function isOrderIdCollision(err: unknown): boolean {
-  const e = err as { code?: string; meta?: { target?: unknown } };
-  if (e?.code !== "P2002") return false;
-  const target = e.meta?.target;
-  return Array.isArray(target) ? target.includes("orderId") : String(target ?? "").includes("orderId");
+  return (err as { code?: number })?.code === 11000; // Mongo duplicate-key error
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 interface OrderConfirmationData {
-  orderId:  string;
-  subtotal: number;
-  gst:      number;
-  shipping: number;
-  discount: number;
-  total:    number;
-  items:    { qty: number; price: number; product: { name: string } }[];
-  address:  { name: string; line1: string; line2: string | null; city: string; state: string; pin: string } | null;
+  orderId: string; subtotal: number; gst: number; shipping: number; discount: number; total: number;
+  items: { qty: number; price: number; productName: string }[];
+  address: { name: string; line1: string; line2?: string; city: string; state: string; pin: string } | null;
 }
 
 function buildOrderConfirmationEmail(order: OrderConfirmationData, customerName: string): string {
-  const rows = order.items.map(i => `
+  const rows = order.items
+    .map(
+      (i) => `
     <tr>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(i.product.name)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(i.productName)}</td>
       <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:center;">${i.qty}</td>
       <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">₹${(i.price * i.qty).toFixed(2)}</td>
-    </tr>`).join("");
+    </tr>`
+    )
+    .join("");
 
   const addr = order.address;
   const addressBlock = addr
@@ -132,13 +122,11 @@ function buildOrderConfirmationEmail(order: OrderConfirmationData, customerName:
     <h2 style="color:#b45309;margin-bottom:4px;">Thank you for your order, ${escapeHtml(customerName)}!</h2>
     <p style="color:#555;">Your order <strong>${order.orderId}</strong> has been placed and is being processed.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:8px 0;border-bottom:2px solid #b45309;">Item</th>
-          <th style="text-align:center;padding:8px 0;border-bottom:2px solid #b45309;">Qty</th>
-          <th style="text-align:right;padding:8px 0;border-bottom:2px solid #b45309;">Amount</th>
-        </tr>
-      </thead>
+      <thead><tr>
+        <th style="text-align:left;padding:8px 0;border-bottom:2px solid #b45309;">Item</th>
+        <th style="text-align:center;padding:8px 0;border-bottom:2px solid #b45309;">Qty</th>
+        <th style="text-align:right;padding:8px 0;border-bottom:2px solid #b45309;">Amount</th>
+      </tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <table style="width:100%;margin-top:8px;font-size:14px;">
@@ -155,31 +143,28 @@ function buildOrderConfirmationEmail(order: OrderConfirmationData, customerName:
   </div>`;
 }
 
-// Restock whatever an order's line items actually decremented at checkout —
-// the product's own stock for plain items, the specific variant's stock for
-// variant items. Used on any transition into a terminal "items are back in
-// the warehouse" state (customer cancel, admin cancel/return).
-async function restockOrderItems(tx: PrismaTx, orderId: string) {
-  const items = await tx.orderItem.findMany({ where: { orderId } });
+// Restock whatever an order's line items decremented at checkout.
+async function restockOrderItems(orderId: mongoose.Types.ObjectId, session: ClientSession) {
+  const items = await OrderItem.find({ orderId }).session(session);
   for (const item of items) {
     if (item.variantId) {
-      await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.qty } } });
+      await ProductVariant.updateOne({ _id: item.variantId }, { $inc: { stock: item.qty } }, { session });
     } else {
-      await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.qty } } });
+      await Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } }, { session });
     }
   }
 }
 
-async function applyCoupon(code: string, subtotal: number) {
-  const coupon = await prisma.coupon.findUnique({ where: { code } });
+async function applyCoupon(code: string, subtotal: number, session: ClientSession) {
+  const coupon = await Coupon.findOne({ code }).session(session);
   if (!coupon || !coupon.isActive) throw new AppError("Invalid coupon code", 400);
   if (coupon.expiresAt && coupon.expiresAt < new Date()) throw new AppError("Coupon expired", 400);
   if (subtotal < coupon.minOrderValue) throw new AppError(`Minimum order ₹${coupon.minOrderValue} required`, 400);
   if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) throw new AppError("Coupon usage limit reached", 400);
 
   let discount = 0;
-  if (coupon.type === "percent") discount = Math.min(coupon.maxDiscount || Infinity, subtotal * coupon.value / 100);
-  if (coupon.type === "flat")    discount = coupon.value;
+  if (coupon.type === "percent") discount = Math.min(coupon.maxDiscount || Infinity, (subtotal * coupon.value) / 100);
+  if (coupon.type === "flat") discount = coupon.value;
 
   return { coupon, discount: Math.round(discount) };
 }
@@ -188,358 +173,405 @@ async function applyCoupon(code: string, subtotal: number) {
 
 /**
  * POST /api/v1/orders
- * Create a new order
  */
-router.post("/", authenticate, validate(CreateOrderSchema), asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-  const data   = req.body as z.infer<typeof CreateOrderSchema>;
+router.post(
+  "/",
+  authenticate,
+  validate(CreateOrderSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const data = req.body as z.infer<typeof CreateOrderSchema>;
 
-  // 1. Validate address belongs to user
-  const address = await prisma.address.findFirst({ where: { id: data.addressId, userId } });
-  if (!address) throw new AppError("Address not found", 404);
+    const address = await Address.findOne({ _id: data.addressId, userId });
+    if (!address) throw new AppError("Address not found", 404);
 
-  // 2. Validate stock & resolve authoritative pricing from the DB
-  const productIds = data.items.map(i => i.productId);
-  const products    = await prisma.product.findMany({
-    where:   { id: { in: productIds } },
-    include: { variants: true },
-  });
+    const productIds = data.items.map((i) => i.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const variantIds = data.items.map((i) => i.variantId).filter(Boolean) as string[];
+    const variants = variantIds.length ? await ProductVariant.find({ _id: { $in: variantIds } }) : [];
 
-  // Resolve each line item against the DB — price and stock are NEVER taken
-  // from the client, only productId/variantId/qty are trusted as references.
-  const resolvedItems = data.items.map(item => {
-    const product = products.find(p => p.id === item.productId);
-    if (!product) throw new AppError(`Product ${item.productId} not found`, 404);
-    if (product.status !== "active") throw new AppError(`${product.name} is not available for purchase`, 400);
+    const resolvedItems = data.items.map((item) => {
+      const product = products.find((p) => String(p._id) === item.productId);
+      if (!product) throw new AppError(`Product ${item.productId} not found`, 404);
+      if (product.status !== "active") throw new AppError(`${product.name} is not available for purchase`, 400);
 
-    if (item.variantId) {
-      const variant = product.variants.find(v => v.id === item.variantId && v.isActive);
-      if (!variant) throw new AppError(`Variant not found for ${product.name}`, 404);
-      if (variant.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name} (${variant.label})`, 400);
-      return { ...item, product, price: variant.price, gstPct: product.gstPct || 5 };
-    }
+      if (item.variantId) {
+        const variant = variants.find((v) => String(v._id) === item.variantId && v.isActive);
+        if (!variant) throw new AppError(`Variant not found for ${product.name}`, 404);
+        if (variant.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name} (${variant.label})`, 400);
+        return { ...item, product, price: variant.price, gstPct: product.gstPct || 5 };
+      }
 
-    if (product.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name}`, 400);
-    return { ...item, product, price: product.price, gstPct: product.gstPct || 5 };
-  });
+      if (product.stock < item.qty) throw new AppError(`Insufficient stock for ${product.name}`, 400);
+      return { ...item, product, price: product.price, gstPct: product.gstPct || 5 };
+    });
 
-  // 3. Calculate totals using server-resolved prices only
-  const subtotal  = resolvedItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const gst       = resolvedItems.reduce((s, i) => s + (i.price * i.qty * i.gstPct / 100), 0);
-  const shipping  = subtotal >= 499 ? 0 : 49;
+    const subtotal = resolvedItems.reduce((s, i) => s + i.price * i.qty, 0);
+    const gst = resolvedItems.reduce((s, i) => s + (i.price * i.qty * i.gstPct) / 100, 0);
+    const shipping = subtotal >= 499 ? 0 : 49;
 
-  let discount  = 0;
-  let couponId: string | undefined;
-  if (data.couponCode) {
-    const result = await applyCoupon(data.couponCode, subtotal);
-    discount = result.discount;
-    couponId = result.coupon.id;
-  }
+    let order: InstanceType<typeof Order> | undefined;
+    let createdItems: InstanceType<typeof OrderItem>[] = [];
 
-  const total = Math.round(subtotal + gst + shipping - discount);
+    for (let attempt = 1; attempt <= MAX_ORDER_ID_ATTEMPTS; attempt++) {
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          let discount = 0;
+          let couponId: mongoose.Types.ObjectId | undefined;
+          if (data.couponCode) {
+            const result = await applyCoupon(data.couponCode, subtotal, session);
+            discount = result.discount;
+            couponId = result.coupon._id as mongoose.Types.ObjectId;
+          }
+          const total = Math.round(subtotal + gst + shipping - discount);
 
-  // 4. Create order in transaction. Retried (from scratch, including the
-  // stock decrements) if — and only if — order creation fails specifically
-  // because generateOrderId() collided with an existing order; any other
-  // failure (e.g. the stock guard below) aborts immediately and propagates
-  // as normal. Retrying the whole transaction is safe here: a collision
-  // means the create() never committed, so nothing has actually decremented
-  // yet on that attempt.
-  let order: Awaited<ReturnType<typeof prisma.order.create>> & {
-    items:   { qty: number; price: number; product: { name: string; sku: string } }[];
-    address: { name: string; line1: string; line2: string | null; city: string; state: string; pin: string } | null;
-  } | undefined;
-  for (let attempt = 1; attempt <= MAX_ORDER_ID_ATTEMPTS; attempt++) {
-    try {
-      order = await prisma.$transaction(async (tx: PrismaTx) => {
-        // Decrement stock (product or variant, matching what was validated above).
-        // Use updateMany with a `stock >= qty` guard instead of a plain update —
-        // this makes the decrement atomic and conditional at the DB level, so two
-        // concurrent checkouts racing for the last unit can't both succeed and
-        // drive stock negative. If the guard fails (someone else beat us to it),
-        // count is 0 and we abort the whole transaction.
-        for (const item of resolvedItems) {
-          if (item.variantId) {
-            const result = await tx.productVariant.updateMany({
-              where: { id: item.variantId, stock: { gte: item.qty } },
-              data:  { stock: { decrement: item.qty } },
-            });
-            if (result.count === 0) {
-              throw new AppError(`Insufficient stock for ${item.product.name} (variant) — please review your cart`, 409);
-            }
-          } else {
-            const result = await tx.product.updateMany({
-              where: { id: item.productId, stock: { gte: item.qty } },
-              data:  { stock: { decrement: item.qty } },
-            });
-            if (result.count === 0) {
-              throw new AppError(`Insufficient stock for ${item.product.name} — please review your cart`, 409);
+          // Atomic, conditional stock decrement — same guard as Prisma's
+          // updateMany({ stock: { gte } }) so two concurrent checkouts
+          // racing the last unit can't both succeed.
+          for (const item of resolvedItems) {
+            if (item.variantId) {
+              const result = await ProductVariant.updateOne(
+                { _id: item.variantId, stock: { $gte: item.qty } },
+                { $inc: { stock: -item.qty } },
+                { session }
+              );
+              if (result.modifiedCount === 0) {
+                throw new AppError(`Insufficient stock for ${item.product.name} (variant) — please review your cart`, 409);
+              }
+            } else {
+              const result = await Product.updateOne(
+                { _id: item.productId, stock: { $gte: item.qty } },
+                { $inc: { stock: -item.qty } },
+                { session }
+              );
+              if (result.modifiedCount === 0) {
+                throw new AppError(`Insufficient stock for ${item.product.name} — please review your cart`, 409);
+              }
             }
           }
-        }
 
-        // Increment coupon usage
-        if (couponId) {
-          await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
-        }
+          if (couponId) {
+            await Coupon.updateOne({ _id: couponId }, { $inc: { usedCount: 1 } }, { session });
+          }
 
-        // Create order
-        return tx.order.create({
-          data: {
-            orderId:       generateOrderId(),
-            userId,
-            addressId:     data.addressId,
-            status:        "pending",
-            paymentMethod: data.paymentMethod,
-            paymentStatus: "pending",
-            subtotal:      Math.round(subtotal),
-            gst:           Math.round(gst),
-            shipping,
-            discount,
-            total,
-            couponId,
-            deliveryDate:  data.deliveryDate ? new Date(data.deliveryDate) : null,
-            deliverySlot:  data.deliverySlot,
-            notes:         data.notes,
-            items:         { create: resolvedItems.map(i => ({
+          const [createdOrder] = await Order.create(
+            [
+              {
+                orderId: generateOrderId(),
+                userId,
+                addressId: data.addressId,
+                address: {
+                  name: address.fullName,
+                  line1: address.line1,
+                  line2: address.line2,
+                  city: address.city,
+                  state: address.state,
+                  pin: address.pincode,
+                },
+                status: "pending",
+                paymentMethod: data.paymentMethod,
+                paymentStatus: "pending",
+                subtotal: Math.round(subtotal),
+                gst: Math.round(gst),
+                shipping,
+                discount,
+                total,
+                couponId,
+                deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
+                deliverySlot: data.deliverySlot,
+                notes: data.notes,
+              },
+            ],
+            { session }
+          );
+
+          order = createdOrder;
+
+          createdItems = await OrderItem.create(
+            resolvedItems.map((i) => ({
+              orderId: order!._id,
               productId: i.productId,
               variantId: i.variantId,
-              qty:       i.qty,
-              price:     i.price,       // server-resolved price, not client input
-              total:     i.price * i.qty,
-            }))},
-          },
-          include: { items: { include: { product: { select: { name: true, sku: true } } } }, address: true },
+              productName: i.product.name,
+              sku: i.product.sku,
+              qty: i.qty,
+              price: i.price,
+              total: i.price * i.qty,
+              gstPct: i.gstPct,
+            })),
+            { session }
+          );
         });
-      });
-      break; // success
-    } catch (err) {
-      if (!isOrderIdCollision(err) || attempt === MAX_ORDER_ID_ATTEMPTS) throw err;
-      // else: loop again — generateOrderId() will produce a fresh suffix
+        await session.endSession();
+        break; // success
+      } catch (err) {
+        await session.endSession();
+        if (!isOrderIdCollision(err) || attempt === MAX_ORDER_ID_ATTEMPTS) throw err;
+        // else: loop again — generateOrderId() will produce a fresh suffix
+      }
     }
-  }
 
-  // Every path through the loop above either assigns `order` and breaks, or
-  // throws (propagating out of this handler) — so this is unreachable in
-  // practice. TS's control-flow analysis can't prove that across an
-  // imperative for/try loop, so this guard both satisfies the type checker
-  // and gives a real error instead of a silent undefined-access crash if the
-  // loop's invariant is ever broken by a future edit.
-  if (!order) throw new AppError("Failed to create order — please try again", 500);
+    if (!order) throw new AppError("Failed to create order — please try again", 500);
 
-  // 5. Notify admin via WebSocket
-  emitToAdmins({
-    event:   "NEW_ORDER_ALERT",
-    payload: { orderId: order.orderId, amount: order.total, customer: userId, timestamp: Date.now() },
-  });
+    emitToAdmins({
+      event: "NEW_ORDER_ALERT",
+      payload: { orderId: order.orderId, amount: order.total, customer: userId, timestamp: Date.now() },
+    });
 
-  // 6. Send confirmation SMS + email (both non-blocking — a notification
-  // failure should never fail order placement, which has already succeeded)
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true, email: true } });
-  if (user?.phone) {
-    sendSMS(user.phone, `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.in/orders`).catch(() => {});
-  }
-  if (user?.email) {
-    sendEmail({
-      to:      user.email,
-      subject: `Order Confirmed — ${order.orderId}`,
-      html:    buildOrderConfirmationEmail(order, user.name),
-    }).catch(err => logger.error(`Order confirmation email failed for ${order.orderId}:`, err.message));
-  }
+    const user = await User.findById(userId).select("phone name email");
+    if (user?.phone) {
+      sendSMS(
+        user.phone,
+        `Hi ${user.name}! Your nityasamagri order ${order.orderId} for ₹${order.total} has been placed. Track it at nityasamagri.in/orders`
+      ).catch(() => {});
+    }
+    if (user?.email) {
+      sendEmail({
+        to: user.email,
+        subject: `Order Confirmed — ${order.orderId}`,
+        html: buildOrderConfirmationEmail(
+          {
+            orderId: order.orderId,
+            subtotal: order.subtotal,
+            gst: order.gst,
+            shipping: order.shipping,
+            discount: order.discount,
+            total: order.total,
+            items: createdItems.map((i) => ({ qty: i.qty, price: i.price, productName: i.productName })),
+            address: order.address,
+          },
+          user.name
+        ),
+      }).catch((err) => logger.error(`Order confirmation email failed for ${order!.orderId}:`, err.message));
+    }
 
-  res.status(201).json({ success: true, data: { order } });
-}));
+    res.status(201).json({ success: true, data: { order: { ...order.toObject(), items: createdItems } } });
+  })
+);
 
 /**
  * GET /api/v1/orders
- * Get current user's orders
  */
-router.get("/", authenticate, validate(MyOrdersQuerySchema, "query"), asyncHandler(async (req: Request, res: Response) => {
-  const q = req.query as unknown as z.infer<typeof MyOrdersQuerySchema>;
+router.get(
+  "/",
+  authenticate,
+  validate(MyOrdersQuerySchema, "query"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as unknown as z.infer<typeof MyOrdersQuerySchema>;
 
-  const where: Record<string, unknown> = { userId: req.user!.userId };
-  if (q.status) where.status = q.status;
+    const filter: Record<string, unknown> = { userId: req.user!.userId };
+    if (q.status) filter.status = q.status;
 
-  const [orders, total] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      include: { items: { include: { product: { select: { name: true, slug: true } } } } },
-      orderBy: { createdAt: "desc" },
-      ...paginate(q.page, q.limit),
-    }),
-    prisma.order.count({ where }),
-  ]);
+    const { skip, take } = paginate(q.page, q.limit);
+    const [orders, total] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(take).lean(),
+      Order.countDocuments(filter),
+    ]);
 
-  res.json({ success: true, data: { orders, pagination: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) } } });
-}));
+    const orderIds = orders.map((o) => o._id);
+    const items = await OrderItem.find({ orderId: { $in: orderIds } }).lean();
+    const itemsByOrder = new Map<string, typeof items>();
+    for (const it of items) {
+      const key = String(it.orderId);
+      if (!itemsByOrder.has(key)) itemsByOrder.set(key, []);
+      itemsByOrder.get(key)!.push(it);
+    }
+    const ordersWithItems = orders.map((o) => ({ ...o, items: itemsByOrder.get(String(o._id)) || [] }));
+
+    res.json({
+      success: true,
+      data: { orders: ordersWithItems, pagination: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) } },
+    });
+  })
+);
 
 /**
  * GET /api/v1/orders/:orderId
- * Get single order detail
  */
-router.get("/:orderId", authenticate, asyncHandler(async (req: Request, res: Response) => {
-  const order = await prisma.order.findFirst({
-    where: {
-      orderId: req.params.orderId,
-      ...(req.user!.role === "customer" ? { userId: req.user!.userId } : {}),
-    },
-    include: {
-      items:    { include: { product: true, variant: true } },
-      address:  true,
-      timeline: { orderBy: { createdAt: "asc" } },
-      coupon:   { select: { code: true, type: true, value: true } },
-    },
-  });
+router.get(
+  "/:orderId",
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const filter: Record<string, unknown> = { orderId: req.params.orderId };
+    if (req.user!.role === "customer") filter.userId = req.user!.userId;
 
-  if (!order) throw new AppError("Order not found", 404);
-  res.json({ success: true, data: { order } });
-}));
+    const order = await Order.findOne(filter).populate("couponId", "code type value").lean();
+    if (!order) throw new AppError("Order not found", 404);
+
+    const [items, timeline] = await Promise.all([
+      OrderItem.find({ orderId: order._id }).populate("productId").populate("variantId").lean(),
+      OrderTimeline.find({ orderId: order._id }).sort({ createdAt: 1 }).lean(),
+    ]);
+
+    res.json({ success: true, data: { order: { ...order, items, timeline } } });
+  })
+);
 
 /**
  * POST /api/v1/orders/:orderId/cancel
- * Customer cancels order (before shipped)
  */
-router.post("/:orderId/cancel", authenticate, asyncHandler(async (req: Request, res: Response) => {
-  const order = await prisma.order.findFirst({
-    where: { orderId: req.params.orderId, userId: req.user!.userId },
-  });
+router.post(
+  "/:orderId/cancel",
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const order = await Order.findOne({ orderId: req.params.orderId, userId: req.user!.userId });
+    if (!order) throw new AppError("Order not found", 404);
+    if (["shipped", "out_for_delivery", "delivered"].includes(order.status)) {
+      throw new AppError("Cannot cancel order after it has been shipped", 400);
+    }
+    if (order.status === "cancelled") throw new AppError("Order already cancelled", 400);
 
-  if (!order) throw new AppError("Order not found", 404);
-  if (["shipped","out_for_delivery","delivered"].includes(order.status)) {
-    throw new AppError("Cannot cancel order after it has been shipped", 400);
-  }
-  if (order.status === "cancelled") throw new AppError("Order already cancelled", 400);
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await restockOrderItems(order._id as mongoose.Types.ObjectId, session);
+        order.status = "cancelled";
+        await order.save({ session });
+        await OrderTimeline.create(
+          [{ orderId: order._id, status: "cancelled", note: req.body.reason || "Cancelled by customer" }],
+          { session }
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
 
-  await prisma.$transaction(async (tx: PrismaTx) => {
-    await restockOrderItems(tx, order.id);
-    await tx.order.update({ where: { id: order.id }, data: { status: "cancelled" } });
-    await tx.orderTimeline.create({
-      data: { orderId: order.id, status: "cancelled", note: req.body.reason || "Cancelled by customer" },
-    });
-  });
-
-  emitOrderUpdate({ userId: order.userId, orderId: order.orderId, status: "cancelled" });
-  res.json({ success: true, message: "Order cancelled successfully" });
-}));
+    emitOrderUpdate({ userId: String(order.userId), orderId: order.orderId, status: "cancelled" });
+    res.json({ success: true, message: "Order cancelled successfully" });
+  })
+);
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
 
 /**
  * GET /api/v1/orders/admin/all
- * Admin: list all orders with filters
  */
-router.get("/admin/all",
-  authenticate, requireRole(["admin","super_admin","order_manager"]),
+router.get(
+  "/admin/all",
+  authenticate,
+  requireRole(["admin", "super_admin", "order_manager"]),
   validate(AdminOrdersQuerySchema, "query"),
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as unknown as z.infer<typeof AdminOrdersQuerySchema>;
 
-    const where: Record<string, unknown> = {};
-    if (q.status)  where.status        = q.status;
-    if (q.payment) where.paymentMethod = q.payment;
-    if (q.q) where.OR = [
-      { orderId:  { contains: q.q } },
-      { user:     { name:  { contains: q.q, mode: "insensitive" } } },
-      { user:     { phone: { contains: q.q } } },
-    ];
+    const filter: Record<string, unknown> = {};
+    if (q.status) filter.status = q.status;
+    if (q.payment) filter.paymentMethod = q.payment;
+    if (q.q) {
+      // "user.name"/"user.phone" search needs the matching user IDs first,
+      // since Order only stores userId (no $lookup join at query time here).
+      const matchingUsers = await User.find({
+        $or: [{ name: { $regex: q.q, $options: "i" } }, { phone: { $regex: q.q } }],
+      }).select("_id");
+      filter.$or = [{ orderId: { $regex: q.q, $options: "i" } }, { userId: { $in: matchingUsers.map((u) => u._id) } }];
+    }
     if (q.dateFrom || q.dateTo) {
-      where.createdAt = {};
-      if (q.dateFrom) (where.createdAt as Record<string,unknown>).gte = new Date(q.dateFrom);
-      if (q.dateTo)   (where.createdAt as Record<string,unknown>).lte = new Date(q.dateTo);
+      filter.createdAt = {};
+      if (q.dateFrom) (filter.createdAt as Record<string, unknown>).$gte = new Date(q.dateFrom);
+      if (q.dateTo) (filter.createdAt as Record<string, unknown>).$lte = new Date(q.dateTo);
     }
 
+    const { skip, take } = paginate(q.page, q.limit);
     const [orders, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        include: {
-          user:  { select: { id: true, name: true, phone: true } },
-          items: { include: { product: { select: { name: true } } } },
-        },
-        orderBy: { createdAt: "desc" },
-        ...paginate(q.page, q.limit),
-      }),
-      prisma.order.count({ where }),
+      Order.find(filter).populate("userId", "name phone").sort({ createdAt: -1 }).skip(skip).limit(take).lean(),
+      Order.countDocuments(filter),
     ]);
 
-    res.json({ success: true, data: { orders, pagination: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) } } });
+    const orderIds = orders.map((o) => o._id);
+    const items = await OrderItem.find({ orderId: { $in: orderIds } }).select("orderId productName qty price").lean();
+    const itemsByOrder = new Map<string, typeof items>();
+    for (const it of items) {
+      const key = String(it.orderId);
+      if (!itemsByOrder.has(key)) itemsByOrder.set(key, []);
+      itemsByOrder.get(key)!.push(it);
+    }
+    const ordersWithItems = orders.map((o) => ({ ...o, items: itemsByOrder.get(String(o._id)) || [] }));
+
+    res.json({
+      success: true,
+      data: { orders: ordersWithItems, pagination: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) } },
+    });
   })
 );
 
 /**
  * PATCH /api/v1/orders/:orderId/status
- * Admin: update order status + WebSocket broadcast
  */
-router.patch("/:orderId/status",
-  authenticate, requireRole(["admin","super_admin","order_manager","warehouse"]),
+router.patch(
+  "/:orderId/status",
+  authenticate,
+  requireRole(["admin", "super_admin", "order_manager", "warehouse"]),
   validate(UpdateStatusSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { status, trackingNo, courierName, note } = req.body as z.infer<typeof UpdateStatusSchema>;
 
-    const order = await prisma.order.findFirst({ where: { orderId: req.params.orderId } });
+    const order = await Order.findOne({ orderId: req.params.orderId });
     if (!order) throw new AppError("Order not found", 404);
 
-    // Restock only on the transition INTO cancelled/returned — never on an
-    // order that's already in one of those states, so calling this twice
-    // (or an admin cancelling an order the customer already cancelled)
-    // can't restock the same items more than once.
     const RESTOCK_STATUSES = ["cancelled", "returned"];
     const alreadyRestocked = RESTOCK_STATUSES.includes(order.status);
-    const shouldRestock    = RESTOCK_STATUSES.includes(status) && !alreadyRestocked;
+    const shouldRestock = RESTOCK_STATUSES.includes(status) && !alreadyRestocked;
 
-    const updated = await prisma.$transaction(async (tx: PrismaTx) => {
-      if (shouldRestock) {
-        await restockOrderItems(tx, order.id);
-      }
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        if (shouldRestock) {
+          await restockOrderItems(order._id as mongoose.Types.ObjectId, session);
+        }
 
-      const o = await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status,
-          ...(trackingNo  && { trackingNo }),
-          ...(courierName && { courierName }),
-        },
+        order.status = status;
+        if (trackingNo) order.trackingNo = trackingNo;
+        if (courierName) order.courierName = courierName;
+        await order.save({ session });
+
+        await OrderTimeline.create(
+          [{ orderId: order._id, status, note: note || `Status updated to ${ORDER_STATUS_LABELS[status]}` }],
+          { session }
+        );
       });
-      await tx.orderTimeline.create({
-        data: { orderId: order.id, status, note: note || `Status updated to ${ORDER_STATUS_LABELS[status]}`, adminId: req.user!.userId },
-      });
-      return o;
-    });
+    } finally {
+      await session.endSession();
+    }
 
-    // Real-time update → customer
-    emitOrderUpdate({ userId: order.userId, orderId: order.orderId, status, data: { trackingNo, courierName } });
+    emitOrderUpdate({ userId: String(order.userId), orderId: order.orderId, status, data: { trackingNo, courierName } });
 
-    // SMS notification
-    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { phone: true, name: true } });
+    const user = await User.findById(order.userId).select("phone name");
     const smsTemplates: Record<string, string> = {
-      confirmed:        `Hi ${user?.name}! Your order ${order.orderId} has been confirmed. `,
-      shipped:          `Hi ${user?.name}! Your order ${order.orderId} has been shipped via ${courierName}. Track: ${trackingNo}`,
+      confirmed: `Hi ${user?.name}! Your order ${order.orderId} has been confirmed. `,
+      shipped: `Hi ${user?.name}! Your order ${order.orderId} has been shipped via ${courierName}. Track: ${trackingNo}`,
       out_for_delivery: `Hi ${user?.name}! Your order ${order.orderId} is out for delivery. Expect it today!`,
-      delivered:        `Hi ${user?.name}! Your order ${order.orderId} has been delivered. Thank you for shopping at nityasamagri! 🙏`,
+      delivered: `Hi ${user?.name}! Your order ${order.orderId} has been delivered. Thank you for shopping at nityasamagri! 🙏`,
     };
     if (user?.phone && smsTemplates[status]) {
       sendSMS(user.phone, smsTemplates[status]).catch(() => {});
     }
 
-    res.json({ success: true, data: { order: updated } });
+    res.json({ success: true, data: { order } });
   })
 );
 
 /**
  * GET /api/v1/orders/admin/stats
- * Admin: dashboard order statistics
  */
-router.get("/admin/stats",
-  authenticate, requireRole(["admin","super_admin"]),
+router.get(
+  "/admin/stats",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
   asyncHandler(async (_req: Request, res: Response) => {
-    const today     = new Date(); today.setHours(0,0,0,0);
-    const monthStart= new Date(today.getFullYear(), today.getMonth(), 1);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const [totalOrders, todayOrders, monthRevenue, statusCounts, paymentSplit] = await Promise.all([
-      prisma.order.count(),
-      prisma.order.count({ where: { createdAt: { gte: today } } }),
-      prisma.order.aggregate({ where: { createdAt: { gte: monthStart }, paymentStatus: "paid" }, _sum: { total: true } }),
-      prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
-      prisma.order.groupBy({ by: ["paymentMethod"], _count: { _all: true } }),
+    const [totalOrders, todayOrders, monthRevenueAgg, statusCounts, paymentSplit] = await Promise.all([
+      Order.countDocuments(),
+      Order.countDocuments({ createdAt: { $gte: today } }),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: monthStart }, paymentStatus: "paid" } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
+      ]),
+      Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Order.aggregate([{ $group: { _id: "$paymentMethod", count: { $sum: 1 } } }]),
     ]);
 
     res.json({
@@ -547,9 +579,9 @@ router.get("/admin/stats",
       data: {
         totalOrders,
         todayOrders,
-        monthRevenue:  monthRevenue._sum.total || 0,
-        statusCounts:  Object.fromEntries(statusCounts.map(s => [s.status, s._count._all])),
-        paymentSplit:  Object.fromEntries(paymentSplit.map(p => [p.paymentMethod, p._count._all])),
+        monthRevenue: monthRevenueAgg[0]?.total || 0,
+        statusCounts: Object.fromEntries(statusCounts.map((s) => [s._id, s.count])),
+        paymentSplit: Object.fromEntries(paymentSplit.map((p) => [p._id, p.count])),
       },
     });
   })
