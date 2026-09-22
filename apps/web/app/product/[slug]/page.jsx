@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { apiFetch } from "../../../lib/auth";
 
 const C = {
   saffron: "#E8560A",
@@ -25,68 +27,90 @@ const C = {
   redBg: "#FFF0EE",
 };
 
-// Product data — Cow Ghee 500ml as the demo product
-const product = {
-  id: "P002",
-  name: "Pure Cow Ghee",
-  subtitle: "A2 Bilona Method · Temple Grade · Cold Pressed",
-  brand: "Gau Prasad",
-  category: "Ghee & Oils",
-  sku: "GHEE-COW-500",
-  rating: 4.9,
-  reviewCount: 521,
-  totalSold: 3200,
-  badge: "Best Seller",
-  images: ["🫙", "🐄", "🔥", "✨"],
-  description: `Pure A2 Cow Ghee made using the traditional Bilona churning method. Sourced from free-range Gir cows and processed without any additives. Perfect for havan, deepak, puja rituals, and daily consumption. Rich golden colour, naturally grainy texture, and authentic aroma that fills your pooja ghar with divinity.`,
-  highlights: [
-    "100% pure A2 Gir cow milk",
-    "Traditional Bilona hand-churned method",
-    "No preservatives, no additives",
-    "Ideal for havan, deepak & cooking",
-    "FSSAI certified · Lab tested",
-    "Golden colour with natural grain texture",
-  ],
-  variants: [
-    { id: "v1", label: "250ml", price: 179, mrp: 220, stock: 45 },
-    { id: "v2", label: "500ml", price: 299, mrp: 349, stock: 120 },
-    { id: "v3", label: "1 Litre", price: 549, mrp: 649, stock: 68 },
-    { id: "v4", label: "2 Litre", price: 999, mrp: 1199, stock: 12 },
-  ],
-  specifications: [
-    ["Type", "A2 Bilona Cow Ghee"],
-    ["Breed", "Gir Cow (Desi)"],
-    ["Method", "Traditional Bilona (hand-churned)"],
-    ["Colour", "Golden Yellow"],
-    ["Texture", "Grainy (natural)"],
-    ["Aroma", "Rich, nutty, authentic"],
-    ["Shelf Life", "12 months (unopened)"],
-    ["Storage", "Cool, dry place. Refrigeration not required."],
-    ["Certifications", "FSSAI, ISO 9001:2015"],
-    ["Origin", "Gujarat, India"],
-    ["HSN Code", "0405"],
-    ["GST", "5%"],
-  ],
-  pujaUses: [
-    { icon: "🔥", title: "Havan & Homa", desc: "Used as the primary ahuti in all fire ceremonies." },
-    { icon: "🪔", title: "Deepak / Diya", desc: "Ghee diya burns longer and brighter with pure cow ghee." },
-    { icon: "🛁", title: "Abhishek", desc: "Poured over Shivling, Vishnu and Ganesh idols during abhishek." },
-    { icon: "🌿", title: "Panchamrit", desc: "One of five sacred ingredients in Panchamrit preparation." },
-    { icon: "🍚", title: "Prasad Cooking", desc: "Used in cooking halwa, khichdi, and all temple prasad." },
-  ],
-  reviews: [
-    { name: "Priya Agarwal", city: "Delhi", rating: 5, date: "18 May 2026", title: "Exactly like the ghee my grandmother made", text: "The aroma is so authentic — pure, rich, nutty. I used it for Satyanarayan katha and the pandit specifically praised the ghee quality. Will order 2L next time.", photos: true, verified: true },
-    { name: "Ramesh Tiwari", city: "Varanasi", rating: 5, date: "14 May 2026", title: "Best ghee for havan", text: "I've tried many brands. This one is genuinely made from A2 milk. The colour is golden and the grain texture confirms it's real bilona method. Perfect for havan.", photos: false, verified: true },
-    { name: "Sunita Mehta", city: "Jaipur", rating: 4, date: "10 May 2026", title: "Very good quality", text: "Great ghee for daily puja and cooking. Packaging could be better — the lid was slightly loose on delivery. But the ghee itself is excellent.", photos: false, verified: true },
-    { name: "Ankit Sharma", city: "Mumbai", rating: 5, date: "5 May 2026", title: "Ordered for Griha Pravesh", text: "Ordered the 2L variant for our Griha Pravesh havan. The pandit was very satisfied with the quality. Fast delivery too — arrived next day!", photos: true, verified: true },
-  ],
-  crossSell: [
-    { id: 3, name: "Hawan Samagri Kit", price: 499, mrp: 649, icon: "🪔", category: "Hawan", rating: 4.8 },
-    { id: 4, name: "Camphor Tablets", price: 65, mrp: 85, icon: "⚪", category: "Puja Samagri", rating: 4.7 },
-    { id: 5, name: "Tulsi Agarbatti Pack", price: 89, mrp: 99, icon: "🕯️", category: "Sugandhit", rating: 4.6 },
-    { id: 6, name: "Copper Diya Set (6pcs)", price: 249, mrp: 349, icon: "🏺", category: "Utensils", rating: 4.9 },
-  ],
-};
+// Generic educational copy — not product-specific data, so it's safe to
+// show for any product rather than inventing per-product content the
+// backend doesn't provide.
+const GENERIC_PUJA_USES = [
+  { icon: "🔥", title: "Havan & Homa", desc: "Commonly used in fire ceremonies as part of the offerings." },
+  { icon: "🪔", title: "Deepak / Diya", desc: "Used to light lamps during daily and festival worship." },
+  { icon: "🛁", title: "Abhishek", desc: "Poured over idols during ritual bathing ceremonies." },
+  { icon: "🌿", title: "Panchamrit", desc: "Often included among the sacred ingredients in Panchamrit." },
+  { icon: "🍚", title: "Prasad", desc: "Used in preparing prasad offered after the ritual." },
+];
+
+// Converts the GET /api/v1/products/:slug response (backend/src/modules/
+// products/product.routes.ts) into the shape this page renders. Fields the
+// backend doesn't store yet (subtitle, brand, images, highlights,
+// per-product puja-use copy) fall back to empty/generic values instead of
+// being invented, so the UI degrades gracefully rather than lying about
+// what's real.
+function normalizeProduct(apiProduct, related) {
+  const variants = (apiProduct.variants || []).map(v => ({
+    id: v._id,
+    label: v.label,
+    price: v.price,
+    mrp: v.mrp,
+    stock: v.stock,
+  }));
+  // Products without configured variants still need one "variant" to drive
+  // the price/qty UI — synthesize it from the product's own price/mrp/stock.
+  if (variants.length === 0) {
+    variants.push({ id: apiProduct._id, label: "Standard", price: apiProduct.price, mrp: apiProduct.mrp, stock: apiProduct.stock });
+  }
+
+  const reviews = (apiProduct.reviews || []).map(r => ({
+    name: r.userId?.name || "Verified Customer",
+    city: "",
+    rating: r.rating,
+    date: r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "",
+    title: r.title || "",
+    text: r.comment || "",
+    photos: false,
+    verified: !!r.isVerifiedPurchase,
+  }));
+  const avgRating = reviews.length
+    ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+    : 0;
+
+  const specifications = [
+    ["SKU", apiProduct.sku],
+    ["Category", apiProduct.categoryId?.name],
+    ["HSN Code", apiProduct.hsnCode],
+    ["GST", apiProduct.gstPct != null ? `${apiProduct.gstPct}%` : undefined],
+    ["Weight", apiProduct.weight ? `${apiProduct.weight} g` : undefined],
+  ].filter(([, v]) => v !== undefined && v !== null && v !== "");
+
+  return {
+    id: apiProduct._id,
+    name: apiProduct.name,
+    subtitle: apiProduct.shortDesc || "",
+    brand: "",
+    category: apiProduct.categoryId?.name || "Puja Samagri",
+    sku: apiProduct.sku,
+    rating: avgRating,
+    reviewCount: apiProduct.reviewCount ?? reviews.length,
+    totalSold: apiProduct.sold ?? 0,
+    badge: apiProduct.isFeatured ? "Featured" : null,
+    images: ["🪔"], // backend Product model has no image field yet
+    description: apiProduct.description || apiProduct.shortDesc || "",
+    highlights: [],
+    variants,
+    specifications,
+    pujaUses: GENERIC_PUJA_USES,
+    reviews,
+    crossSell: (related || []).map(p => ({
+      id: p._id,
+      slug: p.slug,
+      name: p.name,
+      price: p.price,
+      mrp: p.mrp,
+      icon: "🪔",
+      category: "",
+    })),
+  };
+}
+
+const EMPTY_PRODUCT = normalizeProduct({ variants: [], reviews: [] }, []);
 
 function Stars({ n, size = 14 }) {
   return (
@@ -137,7 +161,36 @@ function CrossSellCard({ item, onAdd }) {
 }
 
 export default function ProductDetail() {
-  const [selectedVariant, setSelectedVariant] = useState(product.variants[1]);
+  const { slug } = useParams();
+
+  const [product, setProduct] = useState(EMPTY_PRODUCT);
+  const [selectedVariant, setSelectedVariant] = useState(EMPTY_PRODUCT.variants[0]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+
+    apiFetch(`/products/${slug}`)
+      .then(({ ok, status, body }) => {
+        if (cancelled) return;
+        if (!ok) {
+          if (status === 404) setNotFound(true);
+          return;
+        }
+        const normalized = normalizeProduct(body.data.product, body.data.related);
+        setProduct(normalized);
+        setSelectedVariant(normalized.variants[Math.min(1, normalized.variants.length - 1)]);
+      })
+      .catch(() => { if (!cancelled) setNotFound(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [slug]);
+
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
@@ -174,6 +227,24 @@ export default function ProductDetail() {
   };
 
   const TABS = ["description", "specifications", "puja uses", "reviews"];
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI','Helvetica Neue',sans-serif", color: C.textLight, fontSize: 14 }}>
+        Loading product…
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI','Helvetica Neue',sans-serif", gap: 8 }}>
+        <div style={{ fontSize: 40 }}>🔍</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Product not found</div>
+        <div style={{ fontSize: 13, color: C.textLight }}>It may have been removed or the link is incorrect.</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'Segoe UI', 'Helvetica Neue', sans-serif" }}>
@@ -233,7 +304,9 @@ export default function ProductDetail() {
             {/* Brand + category */}
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: C.saffron, fontWeight: 700, background: C.saffronBg, padding: "3px 10px", borderRadius: 999 }}>{product.category}</span>
-              <span style={{ fontSize: 12, color: C.gold, fontWeight: 700, background: C.goldBg, padding: "3px 10px", borderRadius: 999 }}>🏷 {product.brand}</span>
+              {product.brand && (
+                <span style={{ fontSize: 12, color: C.gold, fontWeight: 700, background: C.goldBg, padding: "3px 10px", borderRadius: 999 }}>🏷 {product.brand}</span>
+              )}
               <span style={{ fontSize: 12, color: C.green, fontWeight: 700, background: C.greenBg, padding: "3px 10px", borderRadius: 999 }}>✓ FSSAI Certified</span>
             </div>
 
@@ -351,7 +424,7 @@ export default function ProductDetail() {
                 <div>
                   <h3 style={{ fontFamily: "'Georgia',serif", fontSize: 18, color: C.text, margin: "0 0 14px" }}>SKU & Details</h3>
                   <div style={{ background: C.cream, borderRadius: 12, padding: "16px 18px", marginBottom: 20 }}>
-                    {[["SKU", product.sku],["Brand", product.brand],["Category", product.category]].map(([k, v]) => (
+                    {[["SKU", product.sku],["Brand", product.brand],["Category", product.category]].filter(([, v]) => !!v).map(([k, v]) => (
                       <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13 }}>
                         <span style={{ color: C.textLight }}>{k}</span>
                         <span style={{ fontWeight: 600, color: C.text }}>{v}</span>
@@ -410,11 +483,11 @@ export default function ProductDetail() {
                     <Stars n={product.rating} size={20} />
                     <div style={{ fontSize: 13, color: C.textLight, marginTop: 6 }}>{product.reviewCount.toLocaleString()} reviews</div>
                   </div>
-                  <RatingBar label="5" pct={78} />
-                  <RatingBar label="4" pct={14} />
-                  <RatingBar label="3" pct={5} />
-                  <RatingBar label="2" pct={2} />
-                  <RatingBar label="1" pct={1} />
+                  {[5, 4, 3, 2, 1].map(star => {
+                    const count = product.reviews.filter(r => Math.round(r.rating) === star).length;
+                    const pct = product.reviews.length ? Math.round((count / product.reviews.length) * 100) : 0;
+                    return <RatingBar key={star} label={String(star)} pct={pct} />;
+                  })}
                 </div>
                 {/* Review cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

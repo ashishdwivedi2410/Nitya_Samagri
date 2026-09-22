@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { apiFetch } from "../../lib/auth";
  
 const COLORS = {
   saffron: "#E8560A",
@@ -20,16 +21,24 @@ const COLORS = {
   white: "#FFFFFF",
 };
  
-const products = [
-  { id: 1, name: "Hawan Samagri Kit", category: "Hawan", price: 499, mrp: 649, img: "🪔", rating: 4.8, reviews: 312, badge: "Best Seller" },
-  { id: 2, name: "Pure Cow Ghee 500ml", category: "Ghee & Oils", price: 299, mrp: 349, img: "🫙", rating: 4.9, reviews: 521, badge: "Top Rated" },
-  { id: 3, name: "Gulab Phool Mala", category: "Phool & Pattiya", price: 50, mrp: 50, img: "🌹", rating: 4.7, reviews: 189, badge: null },
-  { id: 4, name: "Rudrabhishek Kit", category: "Puja Samagri", price: 349, mrp: 499, img: "🪬", rating: 4.8, reviews: 274, badge: "30% Off" },
-  { id: 5, name: "Mangaldeep Agarbatti", category: "Sugandhit", price: 85, mrp: 99, img: "🕯️", rating: 4.6, reviews: 408, badge: null },
-  { id: 6, name: "Navratri Puja Kit", category: "Festival", price: 799, mrp: 1099, img: "🪷", rating: 4.9, reviews: 156, badge: "Festival" },
-  { id: 7, name: "Copper Kalash", category: "Utensil", price: 399, mrp: 499, img: "🏺", rating: 4.7, reviews: 203, badge: null },
-  { id: 8, name: "Tulsi Mala 108 Beads", category: "General", price: 149, mrp: 199, img: "📿", rating: 4.8, reviews: 367, badge: "Sacred" },
-];
+// Converts a product from GET /api/v1/products (backend/src/modules/
+// products/product.routes.ts) into the shape ProductCard renders. The
+// backend has no image or aggregate-rating field on Product yet, so those
+// fall back to a placeholder emoji / null rather than being invented.
+function normalizeListedProduct(p) {
+  return {
+    id: p._id,
+    slug: p.slug,
+    name: p.name,
+    category: p.categoryId?.name || "Puja Samagri",
+    price: p.price,
+    mrp: p.mrp,
+    img: "🪔",
+    rating: null,
+    reviews: null,
+    badge: p.isFeatured ? "Featured" : null,
+  };
+}
  
 const categories = [
   { name: "Puja Samagri", icon: "🪔", count: 320 },
@@ -81,14 +90,22 @@ function ProductCard({ product, onAddCart }) {
           {disc}% OFF
         </div>
       )}
-      <div style={{ background: COLORS.cream, height: 140, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}>
-        {product.img}
-      </div>
-      <div style={{ padding: "14px 16px 16px" }}>
-        <div style={{ fontSize: 11, color: COLORS.saffron, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{product.category}</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 6, lineHeight: 1.3 }}>{product.name}</div>
-        <StarRating rating={product.rating} />
-        <span style={{ fontSize: 11, color: COLORS.textLight, marginLeft: 4 }}>({product.reviews})</span>
+      <Link href={`/product/${product.slug}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+        <div style={{ background: COLORS.cream, height: 140, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}>
+          {product.img}
+        </div>
+        <div style={{ padding: "14px 16px 0" }}>
+          <div style={{ fontSize: 11, color: COLORS.saffron, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{product.category}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 6, lineHeight: 1.3 }}>{product.name}</div>
+        </div>
+      </Link>
+      <div style={{ padding: "0 16px 16px" }}>
+        {product.rating != null && (
+          <>
+            <StarRating rating={product.rating} />
+            <span style={{ fontSize: 11, color: COLORS.textLight, marginLeft: 4 }}>({product.reviews})</span>
+          </>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>₹{product.price}</span>
           {disc > 0 && <span style={{ fontSize: 13, color: COLORS.textLight, textDecoration: "line-through" }}>₹{product.mrp}</span>}
@@ -169,7 +186,27 @@ function AnnouncementBar() {
 export default function StoreFront() {
   const [cart, setCart] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState("");
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProductsLoading(true);
+    setProductsError("");
+
+    apiFetch("/products?limit=20&sortBy=sold&sortOrder=desc")
+      .then(({ ok, body }) => {
+        if (cancelled) return;
+        if (!ok) { setProductsError(body.message || "Couldn't load products."); return; }
+        setProducts((body.data.products || []).map(normalizeListedProduct));
+      })
+      .catch(() => { if (!cancelled) setProductsError("Couldn't reach the server. Please try again."); })
+      .finally(() => { if (!cancelled) setProductsLoading(false); });
+
+    return () => { cancelled = true; };
+  }, []);
  
   const addToCart = (product) => {
     setCart(prev => {
@@ -295,9 +332,17 @@ export default function StoreFront() {
               </button>
             ))}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-            {filteredProducts.map(p => <ProductCard key={p.id} product={p} onAddCart={addToCart} />)}
-          </div>
+          {productsLoading ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: COLORS.textLight, fontSize: 13 }}>Loading products…</div>
+          ) : productsError ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "#C0392B", fontSize: 13 }}>{productsError}</div>
+          ) : filteredProducts.length === 0 ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: COLORS.textLight, fontSize: 13 }}>No products found.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+              {filteredProducts.map(p => <ProductCard key={p.id} product={p} onAddCart={addToCart} />)}
+            </div>
+          )}
         </div>
       </section>
  

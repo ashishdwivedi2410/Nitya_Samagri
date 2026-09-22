@@ -4,6 +4,9 @@ import type { CSSProperties, ReactNode, KeyboardEvent, FormEvent } from "react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ConfirmationResult } from "firebase/auth";
+import { sendFirebaseOtp } from "../../lib/firebase";
+import { apiFetch, saveSession, toE164Phone } from "../../lib/auth";
 
 const C = {
   saffron: "#E8560A", saffronDark: "#B8400A", saffronBg: "#FFF3EC",
@@ -68,6 +71,8 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (val: string) 
   );
 }
 
+const RECAPTCHA_CONTAINER_ID = "ns-login-recaptcha";
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState("login");       // "login" | "signup"
@@ -85,20 +90,34 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
+  // Holds the Firebase confirmation handle between "Send OTP" and
+  // "Verify & Log In" — its .confirm(code) call is what actually validates
+  // the code and hands us back a Firebase ID token.
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
+
   useEffect(() => {
     if (resendIn <= 0) return;
     const t = setInterval(() => setResendIn(s => s - 1), 1000);
     return () => clearInterval(t);
   }, [resendIn]);
 
-  const sendOtp = () => {
-    if (phone.trim().length < 10) { setError("Enter a valid 10-digit phone number."); return; }
+  const sendOtp = async () => {
+    const e164 = toE164Phone(phone);
+    if (!e164) { setError("Enter a valid 10-digit phone number."); return; }
     setError("");
-    setOtpSent(true);
-    setResendIn(30);
+    setLoading(true);
+    try {
+      confirmationRef.current = await sendFirebaseOtp(e164, RECAPTCHA_CONTAINER_ID);
+      setOtpSent(true);
+      setResendIn(30);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
@@ -114,17 +133,62 @@ export default function LoginPage() {
       if (!agree) { setError("Please accept the Terms & Privacy Policy to continue."); return; }
     }
 
+    const e164 = toE164Phone(phone);
+    if (!e164) { setError("Enter a valid 10-digit phone number."); return; }
+
     setLoading(true);
-    // Mock auth — replace with a real call to /api/v1/auth/login or /api/v1/auth/otp/verify
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      if (mode === "login" && method === "password") {
+        const { ok, body } = await apiFetch<{ data: { user: any; accessToken: string; refreshToken: string } }>(
+          "/auth/login",
+          { method: "POST", body: JSON.stringify({ phone: e164, password }) }
+        );
+        if (!ok) throw new Error(body.message || "Invalid phone number or password.");
+        saveSession({ accessToken: body.data.accessToken, refreshToken: body.data.refreshToken }, body.data.user);
+      } else if (mode === "login" && method === "otp") {
+        if (!confirmationRef.current) throw new Error("Please request a new OTP.");
+        const credential = await confirmationRef.current.confirm(otp);
+        const idToken = await credential.user.getIdToken();
+        const { ok, body } = await apiFetch<{ data: { user: any; accessToken: string; refreshToken: string } }>(
+          "/auth/otp/verify",
+          { method: "POST", body: JSON.stringify({ idToken }) }
+        );
+        if (!ok) throw new Error(body.message || "OTP verification failed.");
+        saveSession({ accessToken: body.data.accessToken, refreshToken: body.data.refreshToken }, body.data.user);
+      } else {
+        // Signup — /auth/register only creates the account (no tokens are
+        // issued back), so after this we drop the user into the login tab
+        // to sign in with the password they just set.
+        const { ok, body } = await apiFetch<{ message?: string }>(
+          "/auth/register",
+          { method: "POST", body: JSON.stringify({ name, phone: e164, email: email || undefined, password }) }
+        );
+        if (!ok) throw new Error(body.message || "Registration failed.");
+        setDone(true);
+        setTimeout(() => {
+          setDone(false);
+          setMode("login");
+          setMethod("password");
+          setPassword("");
+        }, 1400);
+        setLoading(false);
+        return;
+      }
+
       setDone(true);
       setTimeout(() => router.push("/account"), 900);
-    }, 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'Segoe UI','Helvetica Neue',sans-serif", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+      {/* Invisible reCAPTCHA anchor required by Firebase phone auth */}
+      <div id={RECAPTCHA_CONTAINER_ID} />
+
       {/* Left — brand panel */}
       <div style={{
         background: `linear-gradient(160deg, ${C.bark} 0%, #3A200E 100%)`, color: C.white,
@@ -168,7 +232,9 @@ export default function LoginPage() {
               <div style={{ fontFamily: "'Georgia',serif", fontSize: 20, color: C.text, marginBottom: 6 }}>
                 {mode === "signup" ? "Account created!" : "Signed in!"}
               </div>
-              <div style={{ fontSize: 13, color: C.textLight }}>Taking you to your account…</div>
+              <div style={{ fontSize: 13, color: C.textLight }}>
+                {mode === "signup" ? "Taking you to log in…" : "Taking you to your account…"}
+              </div>
             </div>
           ) : (
             <>
@@ -196,7 +262,7 @@ export default function LoginPage() {
               {mode === "login" && (
                 <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
                   {[["password", "Password"], ["otp", "OTP"]].map(([k, l]) => (
-                    <button key={k} onClick={() => { setMethod(k); setError(""); setOtpSent(false); setOtp(""); }} style={{
+                    <button key={k} onClick={() => { setMethod(k); setError(""); setOtpSent(false); setOtp(""); confirmationRef.current = null; }} style={{
                       padding: "6px 16px", borderRadius: 999, border: `1.5px solid ${method === k ? C.saffron : C.border}`,
                       background: method === k ? C.saffronBg : "transparent", color: method === k ? C.saffron : C.textMid,
                       fontWeight: 600, fontSize: 12, cursor: "pointer",
@@ -240,8 +306,8 @@ export default function LoginPage() {
                 {mode === "login" && method === "otp" && (
                   <Field label={otpSent ? "Enter OTP" : ""}>
                     {!otpSent ? (
-                      <button type="button" onClick={sendOtp} style={{ ...primaryBtn, background: C.white, color: C.saffron, border: `1.5px solid ${C.saffron}` }}>
-                        Send OTP
+                      <button type="button" onClick={sendOtp} disabled={loading} style={{ ...primaryBtn, background: C.white, color: C.saffron, border: `1.5px solid ${C.saffron}`, opacity: loading ? 0.7 : 1 }}>
+                        {loading ? "Sending…" : "Send OTP"}
                       </button>
                     ) : (
                       <>
@@ -277,8 +343,12 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <button type="submit" disabled={loading} style={{ ...primaryBtn, opacity: loading ? 0.7 : 1, cursor: loading ? "default" : "pointer" }}>
-                  {loading ? "Please wait…" : mode === "login" ? (method === "otp" && otpSent ? "Verify & Log In" : method === "otp" ? "Send OTP" : "Log In") : "Create Account"}
+                <button
+                  type="submit"
+                  disabled={loading || (mode === "login" && method === "otp" && !otpSent)}
+                  style={{ ...primaryBtn, opacity: loading || (mode === "login" && method === "otp" && !otpSent) ? 0.7 : 1, cursor: loading ? "default" : "pointer" }}
+                >
+                  {loading ? "Please wait…" : mode === "login" ? (method === "otp" ? "Verify & Log In" : "Log In") : "Create Account"}
                 </button>
               </form>
 
