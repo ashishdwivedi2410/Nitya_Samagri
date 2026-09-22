@@ -1,11 +1,29 @@
 // apps/admin/app/_lib/adminAuth.ts
-// Mock admin session handling — matches the rest of this repo (no backend wiring yet).
-// Swap `login()` to call POST /api/v1/auth/login and store the returned JWT
-// once the admin app is connected to the real API.
+//
+// Real admin session handling, wired to POST /api/v1/auth/login. Staff log
+// in with an @adminns.in email (not phone — that's the customer flow on
+// apps/web). The backend restricts email-based login to staff roles
+// (admin/super_admin/order_manager/warehouse/support) and rejects anyone
+// else, so there's no separate "is this an admin" check needed here beyond
+// what the API already enforces.
 
 const SESSION_KEY = "nitya_admin_session";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-export function getAdminSession() {
+export interface AdminUser {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+}
+
+export interface AdminSession {
+  accessToken: string;
+  refreshToken: string;
+  user?: AdminUser;
+}
+
+export function getAdminSession(): AdminSession | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(SESSION_KEY);
@@ -15,20 +33,47 @@ export function getAdminSession() {
   }
 }
 
-export function isAdminAuthed() {
-  return !!getAdminSession();
+export function setAdminSession(session: Partial<AdminSession>): void {
+  if (typeof window === "undefined") return;
+  const existing = getAdminSession();
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ ...existing, ...session }));
 }
 
-// Mock login — accepts any non-empty email + password (min 6 chars), like the
-// rest of this codebase's mock forms. Replace with a real API call later.
-export function mockAdminLogin(email: string, password: string) {
-  if (!email || !password || password.length < 6) return { ok: false };
-  const session = { email, role: "ADMIN", name: "Super Admin", loggedInAt: Date.now() };
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return { ok: true, session };
+export function isAdminAuthed(): boolean {
+  return !!getAdminSession()?.accessToken;
 }
 
-export function clearAdminSession() {
+export function clearAdminSession(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SESSION_KEY);
+}
+
+/**
+ * Real login — email must end in @adminns.in (enforced server-side too).
+ * Throws with a user-facing message on failure.
+ */
+export async function adminLogin(email: string, password: string): Promise<AdminSession> {
+  if (!email.toLowerCase().endsWith("@adminns.in")) {
+    throw new Error("Staff login requires an @adminns.in email address.");
+  }
+
+  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(body?.message || body?.errors?.[0]?.message || "Invalid email or password.");
+  }
+
+  const session: AdminSession = {
+    accessToken: body.data.accessToken,
+    refreshToken: body.data.refreshToken,
+    user: body.data.user,
+  };
+  setAdminSession(session);
+  return session;
 }

@@ -6,7 +6,7 @@ export interface IUser extends Document {
   phone: string;
   email?: string;
   password?: string;
-  role: "customer" | "admin" | "pandit" | "support";
+  role: "customer" | "admin" | "super_admin" | "order_manager" | "warehouse" | "pandit" | "support";
   status: "active" | "blocked";
   isVerified: boolean;
   loyaltyPoints: number;
@@ -23,9 +23,9 @@ const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, unique: true, index: true },
-    email: { type: String, lowercase: true, trim: true },
+    email: { type: String, lowercase: true, trim: true, index: true, sparse: true, unique: true },
     password: { type: String, select: false },
-    role: { type: String, enum: ["customer", "admin", "pandit", "support"], default: "customer" },
+    role: { type: String, enum: ["customer", "admin", "super_admin", "order_manager", "warehouse", "pandit", "support"], default: "customer" },
     status: { type: String, enum: ["active", "blocked"], default: "active", index: true },
     isVerified: { type: Boolean, default: false },
     loyaltyPoints: { type: Number, default: 0 },

@@ -28,10 +28,19 @@ const RegisterSchema = z.object({
   password: z.string().min(8).max(72),
 });
 
-const LoginSchema = z.object({
-  phone: z.string().regex(/^\+91[6-9]\d{9}$/),
-  password: z.string().min(1),
-});
+const LoginSchema = z
+  .object({
+    phone: z.string().regex(/^\+91[6-9]\d{9}$/).optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(1),
+  })
+  .refine((d) => !!d.phone !== !!d.email, {
+    message: "Provide either phone or email, not both",
+  })
+  .refine((d) => !d.email || d.email.toLowerCase().endsWith("@adminns.in"), {
+    message: "Email login is only available for @adminns.in staff accounts. Customers should log in with phone.",
+    path: ["email"],
+  });
 
 // Client completes phone OTP entry via the Firebase client SDK and sends us
 // the resulting ID token — we no longer generate/store/verify a 6-digit
@@ -108,9 +117,11 @@ router.post(
   "/login",
   validate(LoginSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { phone, password } = req.body;
+    const { phone, email, password } = req.body as z.infer<typeof LoginSchema>;
+    const identifier = phone || email!.toLowerCase();
+    const isAdminLogin = !!email;
 
-    const lockKey = `login_lock:${phone}`;
+    const lockKey = `login_lock:${identifier}`;
     const locked = await redis.get(lockKey);
     if (locked) {
       const ttl = await redis.ttl(lockKey);
@@ -120,7 +131,7 @@ router.post(
       );
     }
 
-    const failKey = `login_fails:${phone}`;
+    const failKey = `login_fails:${identifier}`;
 
     async function registerFailure(message = "Invalid credentials"): Promise<never> {
       const fails = await redis.incr(failKey);
@@ -137,9 +148,19 @@ router.post(
       throw new AppError(message, 401);
     }
 
-    const user = await User.findOne({ phone }).select("+password");
+    const user = isAdminLogin
+      ? await User.findOne({ email: identifier }).select("+password")
+      : await User.findOne({ phone: identifier }).select("+password");
+
     if (!user) return registerFailure();
     if (user.status === "blocked") throw new AppError("Account has been blocked. Contact support.", 403);
+
+    // Email/@adminns.in login is for staff only — block customers who
+    // happen to have an email on file from using it, and block anyone
+    // without an elevated role even if they somehow got an @adminns.in address.
+    if (isAdminLogin && !["admin", "super_admin", "order_manager", "warehouse", "support"].includes(user.role)) {
+      return registerFailure("This account is not authorized for staff login.");
+    }
 
     if (!user.password) {
       return registerFailure("This account uses OTP login. Please log in with an OTP instead of a password.");

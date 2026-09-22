@@ -3,7 +3,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { mockAdminLogin, isAdminAuthed } from "../_lib/adminAuth";
+import { adminLogin, isAdminAuthed } from "../_lib/adminAuth";
 
 // ─── THEME: Obsidian + Saffron — matches dashboard/store/coupons ─────────────
 const C = {
@@ -40,22 +40,23 @@ export default function AdminLoginPage() {
     if (isAdminAuthed()) router.replace("/dashboard");
   }, [router]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!email.trim()) { setError("Enter your admin email."); return; }
+    if (!email.toLowerCase().endsWith("@adminns.in")) { setError("Staff login requires an @adminns.in email address."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
 
     setLoading(true);
-    // Mock auth — replace with a real call to POST /api/v1/auth/login
-    // (with role check enforced server-side by requireRole middleware).
-    setTimeout(() => {
-      const res = mockAdminLogin(email.trim(), password);
-      setLoading(false);
-      if (!res.ok) { setError("Invalid email or password."); return; }
+    try {
+      await adminLogin(email.trim(), password);
       router.push("/dashboard");
-    }, 700);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,7 +78,7 @@ export default function AdminLoginPage() {
           <form onSubmit={submit}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 6 }}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@nityasamagri.in" style={inputStyle} autoFocus />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@adminns.in" style={inputStyle} autoFocus />
             </div>
             <div style={{ marginBottom: 8 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 6 }}>Password</label>
