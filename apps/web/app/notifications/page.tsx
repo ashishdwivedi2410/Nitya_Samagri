@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { connectNotifications, type WsMessage } from "../../lib/ws";
+import { isLoggedIn } from "../../lib/auth";
 
 const C = {
   saffron: "#E8560A", saffronBg: "#FFF3EC",
@@ -17,32 +19,67 @@ const C = {
   red: "#C0392B", redBg: "#FFF0EE",
 };
 
-const INIT_NOTIFICATIONS = [
-  { id: "n1", type: "order",   icon: "🛵", title: "Out for delivery",         message: "Your order #ORD-2026-1999 is out for delivery, arriving today.", time: "2h ago",    read: false },
-  { id: "n2", type: "offer",   icon: "🎉", title: "Flash sale: 20% off",      message: "DIWALI20 is live — 20% off on all festival kits, today only.",   time: "5h ago",    read: false },
-  { id: "n3", type: "order",   icon: "📦", title: "Order shipped",           message: "Your order #ORD-2026-1999 has shipped via Delhivery.",          time: "Yesterday", read: true  },
-  { id: "n4", type: "account", icon: "🔒", title: "New login detected",       message: "Your account was accessed from a new device in Delhi.",        time: "Yesterday", read: true  },
-  { id: "n5", type: "order",   icon: "✅", title: "Order delivered",         message: "Order #ORD-2026-1842 was delivered. Loved it? Leave a review.",  time: "3 days ago",read: true  },
-  { id: "n6", type: "offer",   icon: "🪔", title: "Navratri kits are live",   message: "Shop curated Navratri puja kits, starting at ₹499.",            time: "5 days ago",read: true  },
-  { id: "n7", type: "account", icon: "🎁", title: "Welcome to nityasamagri", message: "Your account was created successfully. Explore puja essentials.",time: "1 week ago",read: true  },
-];
+type Notif = { id: string; type: string; icon: string; title: string; message: string; time: string; read: boolean };
 
 const FILTERS = [
   { key: "all",     label: "All" },
   { key: "order",   label: "Orders" },
-  { key: "offer",   label: "Offers" },
+  { key: "payment", label: "Payments" },
   { key: "account", label: "Account" },
 ];
 
-const typeColor = {
+const typeColor: Record<string, { fg: string; bg: string }> = {
   order:   { fg: C.blue,    bg: C.blueBg },
-  offer:   { fg: C.gold,    bg: C.goldBg },
+  payment: { fg: C.gold,    bg: C.goldBg },
   account: { fg: C.saffron, bg: C.saffronBg },
 };
 
+// Maps the backend's WsEventType (backend/src/websocket/ws.server.ts) to
+// how this page displays it. Real-time only — the backend has no REST
+// endpoint for notification history, so nothing older than "since this
+// page was opened" can be shown yet.
+function toNotif(msg: WsMessage): Notif | null {
+  const p = msg.payload as any;
+  const base = { id: `${msg.event}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, time: "Just now", read: false };
+  switch (msg.event) {
+    case "ORDER_CONFIRMED":
+      return { ...base, type: "order", icon: "✅", title: "Order confirmed", message: `Order ${p.orderId || ""} has been confirmed.` };
+    case "ORDER_SHIPPED":
+      return { ...base, type: "order", icon: "📦", title: "Order shipped", message: `Order ${p.orderId || ""} is on its way.` };
+    case "ORDER_STATUS_UPDATE":
+      return { ...base, type: "order", icon: "🛵", title: "Order update", message: `Order ${p.orderId || ""} status: ${p.status || "updated"}.` };
+    case "ORDER_DELIVERED":
+      return { ...base, type: "order", icon: "🏠", title: "Order delivered", message: `Order ${p.orderId || ""} was delivered.` };
+    case "PAYMENT_SUCCESS":
+      return { ...base, type: "payment", icon: "💰", title: "Payment successful", message: `Payment of ₹${p.amount ?? ""} was received.` };
+    case "PAYMENT_FAILED":
+      return { ...base, type: "payment", icon: "⚠️", title: "Payment failed", message: p.reason || "Your payment could not be processed." };
+    case "BOOKING_CONFIRMED":
+      return { ...base, type: "order", icon: "🙏", title: "Pandit booking confirmed", message: p.message || "Your pandit booking is confirmed." };
+    case "BOOKING_CANCELLED":
+      return { ...base, type: "order", icon: "❌", title: "Booking cancelled", message: p.message || "Your pandit booking was cancelled." };
+    default:
+      return null; // admin-only events (NEW_ORDER_ALERT, LOW_STOCK_ALERT) are ignored on the storefront
+  }
+}
+
 export default function NotificationsPage() {
-  const [notifs, setNotifs] = useState(INIT_NOTIFICATIONS);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
   const [filter, setFilter] = useState("all");
+  const [status, setStatus] = useState<"connecting" | "open" | "error" | "closed">("connecting");
+  const loggedIn = useRef(isLoggedIn());
+
+  useEffect(() => {
+    if (!loggedIn.current) { setStatus("error"); return; }
+    const disconnect = connectNotifications(
+      (msg) => {
+        const n = toNotif(msg);
+        if (n) setNotifs(prev => [n, ...prev]);
+      },
+      setStatus
+    );
+    return disconnect;
+  }, []);
 
   const visible = filter === "all" ? notifs : notifs.filter(n => n.type === filter);
   const unreadCount = notifs.filter(n => !n.read).length;
@@ -53,7 +90,6 @@ export default function NotificationsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'Segoe UI','Helvetica Neue',sans-serif" }}>
-      {/* Navbar */}
       <nav style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: "0 24px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
@@ -65,12 +101,16 @@ export default function NotificationsPage() {
       </nav>
 
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
           <div>
             <h1 style={{ fontFamily: "'Georgia',serif", fontSize: 26, color: C.text, margin: 0 }}>Notifications</h1>
-            <div style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>
-              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "You're all caught up"}
+            <div style={{ fontSize: 13, color: C.textLight, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", display: "inline-block", background: status === "open" ? C.green : status === "connecting" ? C.gold : C.red }} />
+              {status === "open" && (unreadCount > 0 ? `${unreadCount} unread` : "Live — you're all caught up")}
+              {status === "connecting" && "Connecting…"}
+              {status === "error" && !loggedIn.current && "Log in to see live notifications"}
+              {status === "error" && loggedIn.current && "Couldn't connect — retry by reloading"}
+              {status === "closed" && "Disconnected"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -87,7 +127,10 @@ export default function NotificationsPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        <div style={{ background: C.goldBg, color: C.textMid, fontSize: 12, padding: "10px 14px", borderRadius: 10, marginBottom: 20 }}>
+          These are live events only — the backend doesn't have a notification-history endpoint yet, so nothing from before this page was opened can be shown.
+        </div>
+
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {FILTERS.map(f => {
             const count = f.key === "all" ? notifs.length : notifs.filter(n => n.type === f.key).length;
@@ -101,16 +144,17 @@ export default function NotificationsPage() {
           })}
         </div>
 
-        {/* List */}
         {visible.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: C.textLight }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>🔔</div>
-            <div style={{ fontSize: 14 }}>No notifications here.</div>
+            <div style={{ fontSize: 14 }}>
+              {status === "open" ? "No notifications yet — you'll see updates here as they happen." : "Not connected."}
+            </div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visible.map(n => {
-              const tc = typeColor[n.type as keyof typeof typeColor];
+              const tc = typeColor[n.type] || typeColor.account;
               return (
                 <div key={n.id} onClick={() => toggleRead(n.id)} style={{
                   background: n.read ? C.white : C.saffronBg,

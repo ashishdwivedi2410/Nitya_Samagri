@@ -13,7 +13,9 @@ import { env }          from "./config/env";
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 import authRoutes         from "./modules/auth/auth.routes";
+import addressRoutes      from "./modules/addresses/address.routes";
 import productRoutes      from "./modules/products/product.routes";
+import reviewRoutes       from "./modules/reviews/review.routes";
 import orderRoutes        from "./modules/orders/order.routes";
 import paymentRoutes      from "./modules/payments/payment.routes";
 import integrationsRoutes from "./integrations/integrations.routes";
@@ -55,7 +57,9 @@ app.get("/health", (_req, res) => {
 // ── API Routes ────────────────────────────────────────────────────────────────
 const API = "/api/v1";
 app.use(`${API}/auth`,         authRoutes);
+app.use(`${API}/addresses`,    addressRoutes);
 app.use(`${API}/products`,     productRoutes);
+app.use(`${API}/reviews`,      reviewRoutes);
 app.use(`${API}/orders`,       orderRoutes);
 app.use(`${API}/payments`,     paymentRoutes);
 app.use(`${API}/integrations`, integrationsRoutes);

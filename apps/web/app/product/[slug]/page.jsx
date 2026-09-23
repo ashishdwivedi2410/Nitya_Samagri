@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { apiFetch } from "../../../lib/auth";
+import { useCartStore } from "../../../lib/cartStore";
 
 const C = {
   saffron: "#E8560A",
@@ -194,24 +195,41 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
-  const [cart, setCart] = useState([]);
+  const cartItems = useCartStore((s) => s.items);
+  const addCartItem = useCartStore((s) => s.addItem);
   const [addedMain, setAddedMain] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
   const [pincode, setPincode] = useState("");
   const [deliveryMsg, setDeliveryMsg] = useState(null);
 
   const disc = Math.round(((selectedVariant.mrp - selectedVariant.price) / selectedVariant.mrp) * 100);
-  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
 
+  // Cross-sell cards add the related product itself (no variant); the main
+  // "Add to Cart" button adds the currently-selected variant.
   const addToCart = (item) => {
-    setCart(prev => {
-      const ex = prev.find(i => i.id === item.id);
-      return ex ? prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...item, qty: 1 }];
-    });
+    addCartItem({
+      productId: item.productId || item.id,
+      variantId: item.variantId,
+      name: item.name,
+      variantLabel: item.variantLabel,
+      price: item.price,
+      mrp: item.mrp ?? item.price,
+      icon: item.icon || "🪔",
+      category: item.category || product.category,
+    }, item.qty || 1);
   };
 
   const handleAddMain = () => {
-    addToCart({ id: `${product.id}-${selectedVariant.id}`, name: `${product.name} ${selectedVariant.label}`, price: selectedVariant.price, qty });
+    addToCart({
+      productId: product.id,
+      variantId: selectedVariant.id !== product.id ? selectedVariant.id : undefined,
+      name: product.name,
+      variantLabel: selectedVariant.label,
+      price: selectedVariant.price,
+      mrp: selectedVariant.mrp,
+      qty,
+    });
     setAddedMain(true);
     setTimeout(() => setAddedMain(false), 2000);
   };

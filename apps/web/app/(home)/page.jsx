@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/auth";
+import { useCartStore } from "../../lib/cartStore";
  
 const COLORS = {
   saffron: "#E8560A",
@@ -184,12 +185,13 @@ function AnnouncementBar() {
 }
  
 export default function StoreFront() {
-  const [cart, setCart] = useState([]);
+  const cartItems = useCartStore((s) => s.items);
+  const addCartItem = useCartStore((s) => s.addItem);
   const [activeTab, setActiveTab] = useState("all");
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
-  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,17 +209,20 @@ export default function StoreFront() {
 
     return () => { cancelled = true; };
   }, []);
- 
+
   const addToCart = (product) => {
-    setCart(prev => {
-      const ex = prev.find(i => i.id === product.id);
-      if (ex) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { ...product, qty: 1 }];
+    addCartItem({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      mrp: product.mrp,
+      icon: product.img,
+      category: product.category,
     });
   };
- 
+
   const filteredProducts = activeTab === "all" ? products : products.filter(p => p.category.toLowerCase().includes(activeTab));
- 
+
   return (
     <div style={{ background: COLORS.cream, minHeight: "100vh", fontFamily: "'Segoe UI', 'Helvetica Neue', sans-serif", color: COLORS.text }}>
       <AnnouncementBar />

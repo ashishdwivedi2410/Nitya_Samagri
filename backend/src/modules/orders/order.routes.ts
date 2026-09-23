@@ -396,7 +396,7 @@ router.get(
     const filter: Record<string, unknown> = { orderId: req.params.orderId };
     if (req.user!.role === "customer") filter.userId = req.user!.userId;
 
-    const order = await Order.findOne(filter).populate("couponId", "code type value").lean();
+    const order = await Order.findOne(filter).populate("couponId", "code type value").populate("addressId").lean();
     if (!order) throw new AppError("Order not found", 404);
 
     const [items, timeline] = await Promise.all([

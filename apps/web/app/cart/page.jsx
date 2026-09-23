@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "../../lib/cartStore";
+import { apiFetch, isLoggedIn } from "../../lib/auth";
  
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const C = {
@@ -19,17 +22,14 @@ const C = {
   purple: "#6B2EA8", purpleBg: "#F5EEFF",
 };
  
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const INIT_PRODUCT_CART = [
-  { id: "p1", type: "product", name: "Pure Cow Ghee 500ml", variant: "500ml", price: 299, mrp: 349, qty: 2, icon: "🫙", category: "Ghee & Oils", gstPct: 5 },
-  { id: "p2", type: "product", name: "Hawan Samagri Kit", variant: "Standard", price: 499, mrp: 649, qty: 1, icon: "🪔", category: "Hawan", gstPct: 5 },
-  { id: "p3", type: "product", name: "Tulsi Agarbatti Pack", variant: "20 sticks", price: 89, mrp: 99, qty: 1, icon: "🕯️", category: "Sugandhit", gstPct: 12 },
-];
- 
-const SAVED_ADDRESSES = [
-  { id: "a1", label: "Home", name: "Rahul Sharma", line1: "B-204, Palam Vihar", line2: "Vasant Kunj", city: "New Delhi", state: "Delhi", pin: "110070", phone: "+91 98765 43210", isDefault: true },
-  { id: "a2", label: "Office", name: "Rahul Sharma", line1: "Plot 12, Sector 44", line2: "Cyber City", city: "Gurgaon", state: "Haryana", pin: "122003", phone: "+91 98765 43210", isDefault: false },
-];
+// NOTE: cart items come from useCartStore (see (home)/page.jsx and
+// product/[slug]/page.jsx "Add to Cart"). Addresses come from the real
+// GET/POST /addresses endpoints (backend/src/modules/addresses/) —
+// normalizeAddress() below maps the backend document shape to this page's
+// display shape.
+function normalizeAddress(a) {
+  return { id: a._id, label: a.label, name: a.fullName, phone: a.phone, line1: a.line1, line2: a.line2 || "", city: a.city, state: a.state, pin: a.pincode, isDefault: a.isDefault };
+}
  
 const COUPONS = {
   "DIWALI20": { type: "percent", value: 20, minOrder: 500, desc: "20% off (max ₹200)" },
@@ -42,7 +42,7 @@ function calcProductTotals(items, coupon, shippingFree) {
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
   const mrpTotal = items.reduce((s, i) => s + i.mrp * i.qty, 0);
   const savings = mrpTotal - subtotal;
-  const gst = items.reduce((s, i) => s + (i.price * i.qty * i.gstPct) / 100, 0);
+  const gst = items.reduce((s, i) => s + (i.price * i.qty * (i.gstPct ?? 5)) / 100, 0);
   const shipping = subtotal >= 499 || shippingFree ? 0 : 49;
   let discount = 0;
   if (coupon) {
@@ -84,8 +84,12 @@ function SummaryRow({ label, value, bold, color, small }) {
   );
 }
  
+function itemKey(item) { return `${item.productId}:${item.variantId || ""}`; }
+
 // ─── CART VIEW ────────────────────────────────────────────────────────────────
-function CartView({ productCart, setProductCart, onCheckout }) {
+function CartView({ productCart, onCheckout }) {
+  const setQty = useCartStore((s) => s.setQty);
+  const removeCartItem = useCartStore((s) => s.removeItem);
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponMsg, setCouponMsg] = useState(null);
@@ -97,8 +101,8 @@ function CartView({ productCart, setProductCart, onCheckout }) {
     else { setCouponMsg("Invalid coupon code."); setCouponError(true); setAppliedCoupon(null); }
   };
  
-  const updateQty = (id, delta) => setProductCart(prev => prev.map(i => i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
-  const removeItem = (id) => setProductCart(prev => prev.filter(i => i.id !== id));
+  const updateQty = (item, delta) => setQty(item.productId, item.variantId, Math.max(1, item.qty + delta));
+  const removeItem = (item) => removeCartItem(item.productId, item.variantId);
  
   const pt = calcProductTotals(productCart, appliedCoupon, appliedCoupon?.type === "shipping");
  
@@ -117,27 +121,27 @@ function CartView({ productCart, setProductCart, onCheckout }) {
             {productCart.map(item => {
               const disc = Math.round(((item.mrp - item.price) / item.mrp) * 100);
               return (
-                <div key={item.id} style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "18px 20px", display: "flex", gap: 16, alignItems: "flex-start" }}>
+                <div key={itemKey(item)} style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "18px 20px", display: "flex", gap: 16, alignItems: "flex-start" }}>
                   <div style={{ width: 64, height: 64, background: C.cream, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, flexShrink: 0 }}>{item.icon}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: C.saffron, fontWeight: 700, marginBottom: 2 }}>{item.category}</div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 2 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: C.textLight, marginBottom: 10 }}>Variant: {item.variant}</div>
+                    {item.variantLabel && <div style={{ fontSize: 12, color: C.textLight, marginBottom: 10 }}>Variant: {item.variantLabel}</div>}
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                       {/* Qty stepper */}
                       <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${C.border}`, borderRadius: 9, overflow: "hidden" }}>
-                        <button onClick={() => updateQty(item.id, -1)} style={{ width: 32, height: 32, border: "none", background: C.cream, cursor: "pointer", fontSize: 16, color: C.textMid, fontWeight: 700 }}>−</button>
+                        <button onClick={() => updateQty(item, -1)} style={{ width: 32, height: 32, border: "none", background: C.cream, cursor: "pointer", fontSize: 16, color: C.textMid, fontWeight: 700 }}>−</button>
                         <span style={{ width: 32, textAlign: "center", fontSize: 14, fontWeight: 700, color: C.text }}>{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, +1)} style={{ width: 32, height: 32, border: "none", background: C.cream, cursor: "pointer", fontSize: 16, color: C.textMid, fontWeight: 700 }}>+</button>
+                        <button onClick={() => updateQty(item, +1)} style={{ width: 32, height: 32, border: "none", background: C.cream, cursor: "pointer", fontSize: 16, color: C.textMid, fontWeight: 700 }}>+</button>
                       </div>
-                      <button onClick={() => removeItem(item.id)} style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>✕ Remove</button>
+                      <button onClick={() => removeItem(item)} style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>✕ Remove</button>
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>₹{(item.price * item.qty).toLocaleString()}</div>
                     {disc > 0 && <div style={{ fontSize: 12, color: C.textLight, textDecoration: "line-through" }}>₹{(item.mrp * item.qty).toLocaleString()}</div>}
                     {disc > 0 && <div style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>{disc}% off</div>}
-                    <div style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>+{item.gstPct}% GST</div>
+                    <div style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>+{item.gstPct ?? 5}% GST</div>
                   </div>
                 </div>
               );
@@ -207,51 +211,94 @@ function CartView({ productCart, setProductCart, onCheckout }) {
 }
  
 // ─── ADDRESS STEP ─────────────────────────────────────────────────────────────
-function AddressStep({ selectedAddr, setSelectedAddr }) {
+function AddressStep({ addresses, addressesLoading, addressesError, selectedAddr, setSelectedAddr, onAddressSaved }) {
   const [showNew, setShowNew] = useState(false);
   const [newAddr, setNewAddr] = useState({ name: "", phone: "", line1: "", line2: "", city: "", state: "", pin: "" });
- 
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const saveAddress = async () => {
+    setSaveError("");
+    const phoneDigits = newAddr.phone.replace(/\D/g, "").replace(/^91/, "");
+    const phoneE164 = /^[6-9]\d{9}$/.test(phoneDigits) ? `+91${phoneDigits}` : null;
+    if (!newAddr.name || !phoneE164 || !newAddr.line1 || !newAddr.city || !newAddr.state || !/^\d{6}$/.test(newAddr.pin)) {
+      setSaveError("Please fill in a valid name, 10-digit phone, address line, city, state and 6-digit pincode.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { ok, body } = await apiFetch("/addresses", {
+        method: "POST",
+        body: JSON.stringify({
+          label: "Home", fullName: newAddr.name, phone: phoneE164,
+          line1: newAddr.line1, line2: newAddr.line2 || undefined,
+          city: newAddr.city, state: newAddr.state, pincode: newAddr.pin,
+        }),
+      });
+      if (!ok) throw new Error(body.message || "Couldn't save address.");
+      onAddressSaved(body.data.address);
+      setShowNew(false);
+      setNewAddr({ name: "", phone: "", line1: "", line2: "", city: "", state: "", pin: "" });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 28 }}>
       <div>
         <h2 style={{ fontFamily: "'Georgia',serif", fontSize: 22, color: C.text, margin: "0 0 6px" }}>Delivery Address</h2>
         <p style={{ color: C.textLight, fontSize: 13, margin: "0 0 20px" }}>Where should we deliver your order?</p>
- 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-          {SAVED_ADDRESSES.map(a => (
-            <div key={a.id} onClick={() => setSelectedAddr(a)} style={{ background: C.white, borderRadius: 14, border: `2px solid ${selectedAddr?.id === a.id ? C.saffron : C.border}`, padding: "16px 18px", cursor: "pointer", boxShadow: selectedAddr?.id === a.id ? `0 0 0 3px ${C.saffron}18` : "none", transition: "all 0.15s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${selectedAddr?.id === a.id ? C.saffron : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {selectedAddr?.id === a.id && <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.saffron }} />}
+
+        {addressesLoading ? (
+          <div style={{ padding: "20px 0", color: C.textLight, fontSize: 13 }}>Loading your addresses…</div>
+        ) : addressesError ? (
+          <div style={{ background: C.redBg, color: C.red, fontSize: 12, fontWeight: 600, padding: "10px 14px", borderRadius: 10, marginBottom: 16 }}>{addressesError}</div>
+        ) : addresses.length === 0 ? (
+          <div style={{ background: C.goldBg, color: C.textMid, fontSize: 12, padding: "10px 14px", borderRadius: 10, marginBottom: 16 }}>
+            You don't have any saved addresses yet — add one below to continue.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+            {addresses.map(a => (
+              <div key={a.id} onClick={() => setSelectedAddr(a)} style={{ background: C.white, borderRadius: 14, border: `2px solid ${selectedAddr?.id === a.id ? C.saffron : C.border}`, padding: "16px 18px", cursor: "pointer", boxShadow: selectedAddr?.id === a.id ? `0 0 0 3px ${C.saffron}18` : "none", transition: "all 0.15s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${selectedAddr?.id === a.id ? C.saffron : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {selectedAddr?.id === a.id && <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.saffron }} />}
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.saffron, background: C.saffronBg, padding: "2px 8px", borderRadius: 999 }}>{a.label}</span>
+                    {a.isDefault && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenBg, padding: "2px 8px", borderRadius: 999 }}>Default</span>}
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.saffron, background: C.saffronBg, padding: "2px 8px", borderRadius: 999 }}>{a.label}</span>
-                  {a.isDefault && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenBg, padding: "2px 8px", borderRadius: 999 }}>Default</span>}
                 </div>
-                <button style={{ fontSize: 11, color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 2 }}>{a.name}</div>
+                <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.6 }}>{a.line1}{a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} — {a.pin}</div>
+                <div style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>📞 {a.phone}</div>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 2 }}>{a.name}</div>
-              <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.6 }}>{a.line1}, {a.line2}, {a.city}, {a.state} — {a.pin}</div>
-              <div style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>📞 {a.phone}</div>
-            </div>
-          ))}
-        </div>
- 
+            ))}
+          </div>
+        )}
+
         <button onClick={() => setShowNew(v => !v)} style={{ padding: "11px 18px", borderRadius: 10, border: `1.5px dashed ${C.saffron}`, background: C.saffronBg, color: C.saffron, fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>
           {showNew ? "✕ Cancel" : "+ Add New Address"}
         </button>
- 
+
         {showNew && (
           <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px", marginTop: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {[["Full Name","name","text"],["Phone","phone","tel"],["Address Line 1","line1","text"],["Address Line 2","line2","text"],["City","city","text"],["State","state","text"],["Pincode","pin","text"]].map(([label, key, type]) => (
+              {[["Full Name","name","text"],["Phone (10 digits)","phone","tel"],["Address Line 1","line1","text"],["Address Line 2","line2","text"],["City","city","text"],["State","state","text"],["Pincode","pin","text"]].map(([label, key, type]) => (
                 <div key={key} style={{ gridColumn: key === "line1" || key === "line2" ? "1 / -1" : "auto" }}>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 5 }}>{label}</label>
                   <input type={type} value={newAddr[key]} onChange={e => setNewAddr(v => ({...v, [key]: e.target.value}))} style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, color: C.text, background: C.cream, outline: "none", boxSizing: "border-box" }} />
                 </div>
               ))}
             </div>
-            <button style={{ marginTop: 14, padding: "10px 20px", borderRadius: 9, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Save & Use This Address</button>
+            {saveError && <div style={{ color: C.red, fontSize: 12, fontWeight: 600, marginTop: 10 }}>{saveError}</div>}
+            <button onClick={saveAddress} disabled={saving} style={{ marginTop: 14, padding: "10px 20px", borderRadius: 9, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 13, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "Saving…" : "Save & Use This Address"}
+            </button>
           </div>
         )}
       </div>
@@ -286,8 +333,7 @@ function AddressStep({ selectedAddr, setSelectedAddr }) {
 }
  
 // ─── PAYMENT STEP ─────────────────────────────────────────────────────────────
-function PaymentStep({ productCart, appliedCoupon }) {
-  const [method, setMethod] = useState("upi");
+function PaymentStep({ productCart, appliedCoupon, method, setMethod }) {
   const [upiId, setUpiId] = useState("");
   const [codConfirm, setCodConfirm] = useState(false);
  
@@ -406,7 +452,7 @@ function PaymentStep({ productCart, appliedCoupon }) {
 }
  
 // ─── CONFIRM STEP ─────────────────────────────────────────────────────────────
-function ConfirmStep({ productCart, selectedAddr, appliedCoupon, onPlace }) {
+function ConfirmStep({ productCart, selectedAddr, appliedCoupon, onPlace, placing }) {
   const pt = calcProductTotals(productCart, appliedCoupon, appliedCoupon?.type === "shipping");
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 28 }}>
@@ -418,7 +464,7 @@ function ConfirmStep({ productCart, selectedAddr, appliedCoupon, onPlace }) {
         <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${C.creamDark}` }}>📦 Products</div>
           {productCart.map(i => (
-            <div key={i.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 10, alignItems: "center" }}>
+            <div key={itemKey(i)} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 10, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ fontSize: 18 }}>{i.icon}</span>
                 <div>
@@ -452,8 +498,8 @@ function ConfirmStep({ productCart, selectedAddr, appliedCoupon, onPlace }) {
           {appliedCoupon && <SummaryRow label={`Coupon`} value={`-₹${pt.discount}`} color={C.green} />}
           <div style={{ borderTop: `1.5px dashed ${C.border}`, margin: "12px 0" }} />
           <SummaryRow label="You Pay" value={`₹${pt.total.toLocaleString()}`} bold color={C.saffron} />
-          <button onClick={onPlace} style={{ width: "100%", padding: "14px", borderRadius: 12, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 16 }}>
-            🙏 Place Order · ₹{pt.total.toLocaleString()}
+          <button onClick={onPlace} disabled={placing} style={{ width: "100%", padding: "14px", borderRadius: 12, background: C.saffron, color: C.white, border: "none", fontWeight: 700, fontSize: 15, cursor: placing ? "default" : "pointer", marginTop: 16, opacity: placing ? 0.7 : 1 }}>
+            {placing ? "Placing Order…" : `🙏 Place Order · ₹${pt.total.toLocaleString()}`}
           </button>
           <p style={{ fontSize: 11, color: C.textLight, textAlign: "center", marginTop: 10, lineHeight: 1.6 }}>
             By placing order you agree to our Terms & Conditions. Powered by Razorpay.
@@ -465,8 +511,7 @@ function ConfirmStep({ productCart, selectedAddr, appliedCoupon, onPlace }) {
 }
  
 // ─── SUCCESS SCREEN ───────────────────────────────────────────────────────────
-function SuccessScreen({ onReset }) {
-  const orderId = "#ORD-2026-1999";
+function SuccessScreen({ onReset, orderId }) {
   return (
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: C.white, borderRadius: 24, padding: "56px 48px", maxWidth: 480, width: "100%", textAlign: "center", border: `1px solid ${C.border}` }}>
@@ -494,15 +539,133 @@ function SuccessScreen({ onReset }) {
 const CHECKOUT_STEPS = ["Cart", "Address", "Payment", "Confirm"];
  
 export default function CartCheckout() {
-  const [productCart, setProductCart] = useState(INIT_PRODUCT_CART);
+  const router = useRouter();
+  const productCart = useCartStore((s) => s.items);
+  const clearCart = useCartStore((s) => s.clear);
   const [step, setStep] = useState(0);             // 0=cart 1=address 2=payment 3=confirm
-  const [selectedAddr, setSelectedAddr] = useState(SAVED_ADDRESSES[0]);
+  const [addresses, setAddresses] = useState([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
+  const [addressesError, setAddressesError] = useState("");
+  const [selectedAddr, setSelectedAddr] = useState(null);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [method, setMethod] = useState("upi");
   const [placed, setPlaced] = useState(false);
- 
+  const [placedOrderId, setPlacedOrderId] = useState("");
+  const [placing, setPlacing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+
+  useEffect(() => {
+    if (step !== 1 || !isLoggedIn()) return;
+    let cancelled = false;
+    setAddressesLoading(true);
+    setAddressesError("");
+    apiFetch("/addresses")
+      .then(({ ok, body }) => {
+        if (cancelled) return;
+        if (!ok) { setAddressesError(body.message || "Couldn't load addresses."); return; }
+        const list = (body.data.addresses || []).map(normalizeAddress);
+        setAddresses(list);
+        setSelectedAddr(prev => prev || list.find(a => a.isDefault) || list[0] || null);
+      })
+      .catch(() => { if (!cancelled) setAddressesError("Couldn't reach the server."); })
+      .finally(() => { if (!cancelled) setAddressesLoading(false); });
+    return () => { cancelled = true; };
+  }, [step]);
+
+  const onAddressSaved = (address) => {
+    const normalized = normalizeAddress(address);
+    setAddresses(prev => [normalized, ...prev.filter(a => a.id !== normalized.id)]);
+    setSelectedAddr(normalized);
+  };
+
   const startCheckout = () => setStep(1);
-  const reset = () => { setStep(0); setPlaced(false); };
- 
+  const reset = () => { setStep(0); setPlaced(false); setCheckoutError(""); };
+
+  // Real checkout: POST /orders (using a real Address _id from GET
+  // /addresses), then for online methods POST /payments/create-order →
+  // Razorpay Checkout widget → POST /payments/verify.
+  const placeOrder = async () => {
+    if (!isLoggedIn()) { router.push("/login"); return; }
+    if (!selectedAddr) { setCheckoutError("Please add a delivery address first."); return; }
+    setPlacing(true);
+    setCheckoutError("");
+
+    try {
+      const orderRes = await apiFetch("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          items: productCart.map((i) => ({
+            productId: i.productId,
+            ...(i.variantId ? { variantId: i.variantId } : {}),
+            qty: i.qty,
+          })),
+          addressId: selectedAddr.id,
+          paymentMethod: method,
+          ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
+        }),
+      });
+      if (!orderRes.ok) throw new Error(orderRes.body.message || "Couldn't place your order.");
+      const order = orderRes.body.data.order;
+
+      if (method === "cod") {
+        clearCart();
+        setPlacedOrderId(order.orderId);
+        setPlaced(true);
+        return;
+      }
+
+      // Online payment — create the Razorpay order, then open the checkout
+      // widget (loaded via <script> in layout.tsx).
+      const payRes = await apiFetch("/payments/create-order", {
+        method: "POST",
+        body: JSON.stringify({ orderId: order.orderId }),
+      });
+      if (!payRes.ok) throw new Error(payRes.body.message || "Couldn't start payment.");
+      const pay = payRes.body.data;
+
+      if (typeof window === "undefined" || !window.Razorpay) {
+        throw new Error("Payment widget failed to load. Please refresh and try again.");
+      }
+
+      await new Promise((resolve, reject) => {
+        const rzp = new window.Razorpay({
+          key: pay.keyId,
+          amount: pay.amount,
+          currency: pay.currency,
+          order_id: pay.razorpayOrderId,
+          name: "nityasamagri",
+          handler: async (response) => {
+            try {
+              const verifyRes = await apiFetch("/payments/verify", {
+                method: "POST",
+                body: JSON.stringify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  orderId: order.orderId,
+                }),
+              });
+              if (!verifyRes.ok) throw new Error(verifyRes.body.message || "Payment verification failed.");
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          },
+          modal: { ondismiss: () => reject(new Error("Payment cancelled.")) },
+        });
+        rzp.open();
+      });
+
+      clearCart();
+      setPlacedOrderId(order.orderId);
+      setPlaced(true);
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'Segoe UI','Helvetica Neue',sans-serif" }}>
       {/* Navbar */}
@@ -534,16 +697,21 @@ export default function CartCheckout() {
         )}
  
         {/* Views */}
+        {checkoutError && (
+          <div style={{ background: C.redBg, color: C.red, fontSize: 13, fontWeight: 600, padding: "12px 16px", borderRadius: 10, marginBottom: 16 }}>
+            {checkoutError}
+          </div>
+        )}
         {placed ? (
-          <SuccessScreen onReset={reset} />
+          <SuccessScreen onReset={reset} orderId={placedOrderId} />
         ) : step === 0 ? (
-          <CartView productCart={productCart} setProductCart={setProductCart} onCheckout={startCheckout} />
+          <CartView productCart={productCart} onCheckout={startCheckout} />
         ) : step === 1 ? (
-          <AddressStep selectedAddr={selectedAddr} setSelectedAddr={setSelectedAddr} />
+          <AddressStep addresses={addresses} addressesLoading={addressesLoading} addressesError={addressesError} selectedAddr={selectedAddr} setSelectedAddr={setSelectedAddr} onAddressSaved={onAddressSaved} />
         ) : step === 2 ? (
-          <PaymentStep productCart={productCart} appliedCoupon={appliedCoupon} />
+          <PaymentStep productCart={productCart} appliedCoupon={appliedCoupon} method={method} setMethod={setMethod} />
         ) : step === 3 ? (
-          <ConfirmStep productCart={productCart} selectedAddr={selectedAddr} appliedCoupon={appliedCoupon} onPlace={() => setPlaced(true)} />
+          <ConfirmStep productCart={productCart} selectedAddr={selectedAddr} appliedCoupon={appliedCoupon} onPlace={placeOrder} placing={placing} />
         ) : null}
  
         {/* Next button */}

@@ -16,6 +16,7 @@ import { AppError } from "../../utils/AppError";
 import { asyncHandler } from "../../middlewares/async.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import { authenticate } from "../../middlewares/auth.middleware";
+import { requireRole } from "../../middlewares/rbac.middleware";
 import { verifyOtpToken } from "../../config/firebase";
 
 const router = Router();
@@ -290,6 +291,33 @@ router.get(
     );
     if (!user) throw new AppError("User not found", 404);
     res.json({ success: true, data: { user } });
+  })
+);
+
+
+/**
+ * GET /api/v1/auth/admin/users
+ * Admin: list customers (paginated, searchable)
+ */
+router.get(
+  "/admin/users",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
+  asyncHandler(async (req: Request, res: Response) => {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const q = req.query.q as string | undefined;
+
+    const filter: Record<string, unknown> = { role: "customer" };
+    if (q) filter.$or = [{ name: { $regex: q, $options: "i" } }, { phone: { $regex: q } }, { email: { $regex: q, $options: "i" } }];
+
+    const [users, total] = await Promise.all([
+      User.find(filter).select("name phone email status loyaltyPoints loyaltyTier createdAt lastLoginAt")
+        .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({ success: true, data: { users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } } });
   })
 );
 

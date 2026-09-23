@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAccountStore } from "../../lib/accountStore";
+import { clearSession, isLoggedIn } from "../../lib/auth";
  
 const C = {
   saffron: "#E8560A",
@@ -30,71 +33,9 @@ const C = {
   purpleBg: "#F5EEFF",
 };
  
-const user = {
-  name: "Rahul Sharma",
-  email: "rahul.sharma@gmail.com",
-  phone: "+91 98765 43210",
-  joined: "March 2024",
-  avatar: "R",
-  tier: "Gold",
-  points: 2450,
-  totalOrders: 18,
-  totalSpend: 14820,
-  savedAddresses: 3,
-};
- 
-const orders = [
-  {
-    id: "#ORD-2026-1842", date: "28 May 2026", status: "Delivered", amount: 798,
-    items: [{ name: "Pure Cow Ghee 500ml", qty: 2, price: 299, icon: "🫙" }, { name: "Camphor Tablets 50g", qty: 1, price: 65, icon: "⚪" }],
-    payment: "UPI", courier: "Delhivery", tracking: "DL2026182734",
-    timeline: [
-      { label: "Order Placed", date: "28 May, 10:30 AM", done: true },
-      { label: "Confirmed", date: "28 May, 10:32 AM", done: true },
-      { label: "Packed", date: "28 May, 1:15 PM", done: true },
-      { label: "Shipped", date: "28 May, 4:00 PM", done: true },
-      { label: "Delivered", date: "29 May, 11:20 AM", done: true },
-    ],
-    canReturn: true, canReview: true,
-  },
-  {
-    id: "#ORD-2026-1791", date: "20 May 2026", status: "Shipped", amount: 1249,
-    items: [{ name: "Hawan Samagri Kit", qty: 1, price: 499, icon: "🪔" }, { name: "Copper Kalash", qty: 1, price: 399, icon: "🏺" }, { name: "Tulsi Mala 108 Beads", qty: 1, price: 149, icon: "📿" }],
-    payment: "Razorpay", courier: "Shiprocket", tracking: "SR2026179182",
-    timeline: [
-      { label: "Order Placed", date: "20 May, 9:00 AM", done: true },
-      { label: "Confirmed", date: "20 May, 9:05 AM", done: true },
-      { label: "Packed", date: "20 May, 3:30 PM", done: true },
-      { label: "Shipped", date: "21 May, 8:00 AM", done: true },
-      { label: "Delivered", date: "", done: false },
-    ],
-    canReturn: false, canReview: false,
-  },
-  {
-    id: "#ORD-2026-1650", date: "8 May 2026", status: "Delivered", amount: 499,
-    items: [{ name: "Navratri Puja Kit", qty: 1, price: 499, icon: "🪷" }],
-    payment: "COD", courier: "DTDC", tracking: "DT2026165034",
-    timeline: [
-      { label: "Order Placed", date: "8 May, 6:45 PM", done: true },
-      { label: "Confirmed", date: "8 May, 7:00 PM", done: true },
-      { label: "Packed", date: "9 May, 10:00 AM", done: true },
-      { label: "Shipped", date: "9 May, 2:00 PM", done: true },
-      { label: "Delivered", date: "11 May, 12:30 PM", done: true },
-    ],
-    canReturn: false, canReview: true,
-  },
-  {
-    id: "#ORD-2026-1412", date: "15 Apr 2026", status: "Cancelled", amount: 349,
-    items: [{ name: "Rudrabhishek Kit", qty: 1, price: 349, icon: "🪬" }],
-    payment: "UPI", courier: "—", tracking: "—",
-    timeline: [
-      { label: "Order Placed", date: "15 Apr, 11:00 AM", done: true },
-      { label: "Cancelled", date: "15 Apr, 11:45 AM", done: true },
-    ],
-    canReturn: false, canReview: false,
-  },
-];
- 
+// NOTE: profile + orders now come from useAccountStore (GET /auth/me,
+// GET /orders). wishlist/addresses/rewardHistory below remain local mock
+// data — there is no backend model/endpoint for any of them yet.
 const wishlist = [
   { id: 1, name: "Pure Cow Ghee 1L", price: 549, mrp: 649, icon: "🫙", inStock: true },
   { id: 2, name: "Brass Puja Thali Set", price: 799, mrp: 999, icon: "🪙", inStock: true },
@@ -150,6 +91,8 @@ function SectionHeader({ title, subtitle, action }) {
 // ─── VIEWS ───────────────────────────────────────────────────────────────────
  
 function OverviewView({ setView }) {
+  const user = useAccountStore(s => s.user);
+  const orders = useAccountStore(s => s.orders);
   return (
     <div>
       {/* Welcome banner */}
@@ -211,6 +154,8 @@ function OverviewView({ setView }) {
 }
  
 function OrdersView() {
+  const user = useAccountStore(s => s.user);
+  const orders = useAccountStore(s => s.orders);
   const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState("All");
   const filters = ["All", "Delivered", "Shipped", "Cancelled"];
@@ -377,6 +322,7 @@ function AddressesView() {
 }
  
 function RewardsView() {
+  const user = useAccountStore(s => s.user);
   const nextTier = { tier: "Platinum", required: 50000, current: user.totalSpend };
   const pct = Math.min(100, Math.round((nextTier.current / nextTier.required) * 100));
   return (
@@ -443,6 +389,7 @@ function RewardsView() {
 }
  
 function ProfileView() {
+  const user = useAccountStore(s => s.user);
   const [form, setForm] = useState({ name: user.name, email: user.email, phone: user.phone, dob: "15 Mar 1990", gender: "Male" });
   const [saved, setSaved] = useState(false);
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
@@ -524,8 +471,31 @@ const NAV = [
 ];
  
 export default function CustomerAccount() {
+  const router = useRouter();
   const [view, setView] = useState("overview");
   const active = NAV.find(n => n.id === view);
+  const user = useAccountStore(s => s.user);
+  const loading = useAccountStore(s => s.loading);
+  const error = useAccountStore(s => s.error);
+  const load = useAccountStore(s => s.load);
+
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace("/login"); return; }
+    load();
+  }, []);
+
+  const signOut = () => {
+    clearSession();
+    router.push("/login");
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI','Helvetica Neue',sans-serif", color: C.textLight, fontSize: 14 }}>
+        Loading your account…
+      </div>
+    );
+  }
  
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'Segoe UI','Helvetica Neue',sans-serif" }}>
@@ -578,13 +548,16 @@ export default function CustomerAccount() {
             <Link href="/notifications" style={{ flex: 1, textAlign: "center", padding: "10px", borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>🔔 Notifications</Link>
             <Link href="/reviews" style={{ flex: 1, textAlign: "center", padding: "10px", borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>⭐ Reviews</Link>
           </div>
-          <button style={{ width: "100%", marginTop: 12, padding: "12px", borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.white, color: C.red, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          <button onClick={signOut} style={{ width: "100%", marginTop: 12, padding: "12px", borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.white, color: C.red, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             Sign Out
           </button>
         </div>
  
         {/* Main content */}
         <div>
+          {error && (
+            <div style={{ background: C.redBg, color: C.red, fontSize: 12, fontWeight: 600, padding: "10px 14px", borderRadius: 10, marginBottom: 16 }}>{error}</div>
+          )}
           {view === "overview"  && <OverviewView setView={setView} />}
           {view === "orders"    && <OrdersView />}
           {view === "wishlist"  && <WishlistView />}
