@@ -11,7 +11,7 @@ on:
     branches: [main]
     paths:
       - "chatbot/**"
-      - "github-actions/chatbot.yml"
+      - ".github/workflows/chatbot.yml"
   pull_request:
     branches: [main]
     paths:
