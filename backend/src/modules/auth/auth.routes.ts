@@ -317,7 +317,21 @@ router.get(
       User.countDocuments(filter),
     ]);
 
-    res.json({ success: true, data: { users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } } });
+    const { Order } = await import("../../database/models/Order");
+    const userIds = users.map((u) => u._id);
+    const orderAgg = await Order.aggregate([
+      { $match: { userId: { $in: userIds }, paymentStatus: "paid" } },
+      { $group: { _id: "$userId", orders: { $sum: 1 }, spend: { $sum: "$total" }, lastOrder: { $max: "$createdAt" } } },
+    ]);
+    const aggByUser = new Map(orderAgg.map((a) => [String(a._id), a]));
+    const usersWithStats = users.map((u) => ({
+      ...u,
+      orders: aggByUser.get(String(u._id))?.orders || 0,
+      spend: aggByUser.get(String(u._id))?.spend || 0,
+      lastOrder: aggByUser.get(String(u._id))?.lastOrder || null,
+    }));
+
+    res.json({ success: true, data: { users: usersWithStats, pagination: { page, limit, total, pages: Math.ceil(total / limit) } } });
   })
 );
 

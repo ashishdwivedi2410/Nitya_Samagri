@@ -17,11 +17,13 @@ function modelFor(key: string) {
   return m;
 }
 
-// Public read — storefront pulls active content
+// GET returns everything — filtering by active/status is left to callers
+// (admin UI always wants the full list; a public storefront consumer can
+// filter client-side, since each resource's "is this live" field has a
+// different name: Banner.status, Section/Announcement.active, Festival.status).
 router.get("/:resource", asyncHandler(async (req: Request, res: Response) => {
   const M = modelFor(req.params.resource);
-  const filter = req.query.all === "1" ? {} : { isActive: true };
-  const items = await M.find(filter as Record<string, unknown>).sort({ sortOrder: 1, createdAt: -1 }).lean();
+  const items = await M.find().sort({ sortOrder: 1, createdAt: -1 }).lean();
   res.json({ success: true, data: { items } });
 }));
 

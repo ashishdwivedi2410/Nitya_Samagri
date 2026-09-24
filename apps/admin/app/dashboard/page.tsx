@@ -2,9 +2,17 @@
 
 import type React from "react";
 import { useState } from "react";
+import useSWR from "swr";
 import RequireAuth from "../_components/RequireAuth";
 import { clearAdminSession } from "../_lib/adminAuth";
+import { api } from "../_lib/api";
 import { useRouter } from "next/navigation";
+
+const fetcher = (url: string) => api.get<any>(url).then(r => r.data);
+const ICONS = ["🫙","🪔","📿","🪬","🏺","🪷","🕯️"];
+const iconFor = (seed: string) => ICONS[[...seed].reduce((a,c)=>a+c.charCodeAt(0),0) % ICONS.length];
+const STATUS_LABEL: Record<string,string> = { pending:"Pending", confirmed:"Confirmed", packed:"Packed", ready_for_pickup:"Ready for Pickup", shipped:"Shipped", out_for_delivery:"Out for Delivery", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned", refunded:"Refunded", NDR:"NDR" };
+const STATUS_COLOR: Record<string,string> = { pending:"#F5A623", confirmed:"#3B82F6", packed:"#A855F7", shipped:"#E8560A", delivered:"#22C55E", cancelled:"#EF4444" };
 
 // ─── THEME: Obsidian + Saffron — dark professional with warm accent ───────────
 const C = {
@@ -36,75 +44,6 @@ const C = {
 };
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const OVERVIEW_STATS = [
-  { label:"Revenue (Month)",   value:"₹4.82L",  sub:"+18% vs May",   trend:+18, icon:"💰", color:C.saffron,  bg:C.saffronBg },
-  { label:"Total Orders",      value:"1,284",   sub:"↑ 142 today",   trend:+12, icon:"📦", color:C.blue,     bg:C.blueBg    },
-  { label:"Active Customers",  value:"8,921",   sub:"+56 new today", trend:+8,  icon:"👥", color:C.green,    bg:C.greenBg   },
-  { label:"Avg Order Value",   value:"₹876",    sub:"+₹42 vs May",  trend:+5,  icon:"📊", color:C.marigold, bg:C.marigoldBg},
-  { label:"Pending Orders",    value:"87",      sub:"15 urgent",     trend:-3,  icon:"⏳", color:C.red,      bg:C.redBg     },
-];
-
-const REVENUE_CHART = [
-  { month:"Jan", rev:420000, orders:520  },
-  { month:"Feb", rev:510000, orders:640  },
-  { month:"Mar", rev:480000, orders:600  },
-  { month:"Apr", rev:620000, orders:780  },
-  { month:"May", rev:408000, orders:510  },
-  { month:"Jun", rev:482000, orders:612  },
-];
-
-const ORDER_STATUS_DIST = [
-  { label:"Pending",        count:87,  color:C.marigold },
-  { label:"Confirmed",      count:143, color:C.blue     },
-  { label:"Packed",         count:58,  color:C.purple   },
-  { label:"Shipped",        count:312, color:C.saffron  },
-  { label:"Delivered",      count:645, color:C.green    },
-  { label:"Cancelled",      count:39,  color:C.red      },
-];
-
-const RECENT_ORDERS = [
-  { id:"#ORD-2026-1999", customer:"Rahul Sharma",    city:"Delhi",   amount:798,  status:"Shipped",   payment:"UPI",       items:2, time:"10:32 AM", icon:"🫙" },
-  { id:"#ORD-2026-1998", customer:"Priya Verma",     city:"Jaipur",  amount:499,  status:"Delivered", payment:"Razorpay",  items:1, time:"9:15 AM",  icon:"🪔" },
-  { id:"#ORD-2026-1997", customer:"Amit Singh",      city:"Noida",   amount:1249, status:"Pending",   payment:"COD",       items:3, time:"8:48 AM",  icon:"📿" },
-  { id:"#ORD-2026-1996", customer:"Sunita Mehta",    city:"Mumbai",  amount:349,  status:"Confirmed", payment:"Razorpay",  items:1, time:"8:02 AM",  icon:"🪬" },
-  { id:"#ORD-2026-1995", customer:"Vikram Pandey",   city:"Lucknow", amount:688,  status:"Packed",    payment:"UPI",       items:2, time:"7:55 AM",  icon:"🏺" },
-  { id:"#ORD-2026-1994", customer:"Neha Agarwal",    city:"Delhi",   amount:299,  status:"Cancelled", payment:"UPI",       items:1, time:"7:30 AM",  icon:"🫙" },
-  { id:"#ORD-2026-1993", customer:"Rohit Sharma",    city:"Agra",    amount:1599, status:"Shipped",   payment:"Card",      items:4, time:"7:12 AM",  icon:"🪷" },
-  { id:"#ORD-2026-1992", customer:"Kavita Joshi",    city:"Delhi",   amount:549,  status:"Delivered", payment:"Razorpay",  items:2, time:"6:58 AM",  icon:"🕯️" },
-];
-
-const USERS = [
-  { id:"C001", name:"Rahul Sharma",  email:"rahul@gmail.com",   phone:"+91 98765 43210", city:"Delhi",   orders:18, spend:14820, status:"Active",   tier:"Gold",     joined:"Mar 2024", lastOrder:"28 May 2026", avatar:"R" },
-  { id:"C002", name:"Priya Verma",   email:"priya@gmail.com",   phone:"+91 87654 32109", city:"Jaipur",  orders:7,  spend:5420,  status:"Active",   tier:"Silver",   joined:"Jun 2024", lastOrder:"31 May 2026", avatar:"P" },
-  { id:"C003", name:"Amit Singh",    email:"amit@gmail.com",    phone:"+91 76543 21098", city:"Noida",   orders:32, spend:28400, status:"Active",   tier:"Platinum", joined:"Jan 2024", lastOrder:"30 May 2026", avatar:"A" },
-  { id:"C004", name:"Sunita Mehta",  email:"sunita@gmail.com",  phone:"+91 65432 10987", city:"Mumbai",  orders:3,  spend:1250,  status:"Active",   tier:"New",      joined:"May 2026", lastOrder:"29 May 2026", avatar:"S" },
-  { id:"C005", name:"Vikram Pandey", email:"vikram@gmail.com",  phone:"+91 54321 09876", city:"Lucknow", orders:0,  spend:0,     status:"Inactive", tier:"New",      joined:"Apr 2026", lastOrder:"—",           avatar:"V" },
-  { id:"C006", name:"Neha Agarwal",  email:"neha@gmail.com",    phone:"+91 43210 98765", city:"Delhi",   orders:11, spend:8900,  status:"Active",   tier:"Silver",   joined:"Nov 2023", lastOrder:"28 May 2026", avatar:"N" },
-  { id:"C007", name:"Rohit Mehta",   email:"rohit@gmail.com",   phone:"+91 32109 87654", city:"Agra",    orders:5,  spend:3200,  status:"Blocked",  tier:"Silver",   joined:"Feb 2024", lastOrder:"15 Apr 2026", avatar:"R" },
-];
-
-const CATEGORY_PERF = [
-  { name:"Puja Samagri", rev:182000, orders:420, pct:38, color:C.saffron  },
-  { name:"Ghee & Oils",  rev:124000, orders:310, pct:26, color:C.marigold },
-  { name:"Hawan",        rev:89000,  orders:198, pct:18, color:C.gold     },
-  { name:"Idols",        rev:52000,  orders:112, pct:11, color:C.blue     },
-  { name:"Sugandhit",    rev:35000,  orders:88,  pct:7,  color:C.purple   },
-];
-
-const TOP_PRODUCTS = [
-  { name:"Pure Cow Ghee 500ml",  sold:1240, rev:370760, icon:"🫙", trend:+15 },
-  { name:"Hawan Samagri Kit",    sold:892,  rev:445108, icon:"🪔", trend:+22 },
-  { name:"Mangaldeep Agarbatti", sold:744,  rev:63240,  icon:"🕯️", trend:+8  },
-  { name:"Navratri Puja Kit",    sold:412,  rev:329588, icon:"🪷", trend:+31 },
-  { name:"Tulsi Mala 108 Beads", sold:389,  rev:57961,  icon:"📿", trend:-4  },
-];
-
-const ALERTS = [
-  { type:"danger",  msg:"Cow Ghee 500ml — stock below 10 units",   time:"2 min ago" },
-  { type:"warning", msg:"Order #ORD-1847 pending > 48 hours",       time:"1 hr ago"  },
-  { type:"danger",  msg:"3 payment failures in last 30 minutes",    time:"32 min ago"},
-  { type:"info",    msg:"Navratri campaign starts in 3 days",       time:"Today"     },
-];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { color: string; bg: string }> = {
@@ -155,8 +94,35 @@ function TD({ children, bold, color, style }: { children: React.ReactNode; bold?
 
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
 function OverviewView() {
-  const maxRev = Math.max(...REVENUE_CHART.map(r=>r.rev));
-  const totalOrders = ORDER_STATUS_DIST.reduce((s,o)=>s+o.count,0);
+  const { data: stats } = useSWR("/api/v1/orders/admin/stats", fetcher);
+  const { data: usersMeta } = useSWR("/api/v1/auth/admin/users?limit=1", fetcher);
+
+  const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const PALETTE = [C.saffron, C.marigold, C.gold, C.blue, C.purple, C.green];
+  const STATUS_ORDER = ["pending","confirmed","packed","shipped","delivered","cancelled"];
+
+  const REVENUE_CHART = (stats?.revenueTrend || []).map((r: any) => ({
+    month: MONTH_NAMES[Number(r.month.split("-")[1]) - 1], rev: r.revenue, orders: r.orders,
+  }));
+  const ORDER_STATUS_DIST = STATUS_ORDER
+    .filter(k => (stats?.statusCounts?.[k] ?? 0) > 0)
+    .map((k, i) => ({ label: STATUS_LABEL[k] || k, count: stats.statusCounts[k], color: STATUS_COLOR[k] || PALETTE[i % PALETTE.length] }));
+  const TOP_PRODUCTS = (stats?.topProducts || []).map((p: any) => ({ name: p.name, sold: p.qtySold, rev: p.revenue, icon: iconFor(p.name), trend: 0 }));
+  const catTotal = (stats?.categoryPerf || []).reduce((s: number, c: any) => s + c.revenue, 0) || 1;
+  const CATEGORY_PERF = (stats?.categoryPerf || []).map((c: any, i: number) => ({ name: c._id, rev: c.revenue, orders: c.qtySold, pct: Math.round((c.revenue / catTotal) * 100), color: PALETTE[i % PALETTE.length] }));
+  const OVERVIEW_STATS = stats ? [
+    { label:"Revenue (Month)",  value:`₹${(stats.monthRevenue/100000).toFixed(2)}L`, sub:"this month",     trend:0, icon:"💰", color:C.saffron,  bg:C.saffronBg },
+    { label:"Total Orders",     value:stats.totalOrders.toLocaleString(),            sub:`↑ ${stats.todayOrders} today`, trend:0, icon:"📦", color:C.blue,     bg:C.blueBg    },
+    { label:"Active Customers", value:(usersMeta?.pagination?.total ?? 0).toLocaleString(), sub:"total signed up", trend:0, icon:"👥", color:C.green,    bg:C.greenBg   },
+    { label:"Avg Order Value",  value:`₹${stats.totalOrders ? Math.round(stats.monthRevenue/stats.totalOrders) : 0}`, sub:"", trend:0, icon:"📊", color:C.marigold, bg:C.marigoldBg},
+    { label:"Pending Orders",   value:String(stats.statusCounts?.pending || 0),       sub:"needs action",   trend:0, icon:"⏳", color:C.red,      bg:C.redBg     },
+  ] : [];
+  const ALERTS: { type: string; msg: string; time: string }[] = []; // no backend alerts system yet
+
+  const maxRev = Math.max(1, ...REVENUE_CHART.map(r=>r.rev));
+  const totalOrders = ORDER_STATUS_DIST.reduce((s,o)=>s+o.count,0) || 1;
+
+  if (!stats) return <div style={{ padding:40, color:C.textLight, textAlign:"center" }}>Loading dashboard…</div>;
 
   return (
     <div>
@@ -289,9 +255,17 @@ function OverviewView() {
 
 // ─── ORDERS ───────────────────────────────────────────────────────────────────
 function OrdersView() {
+  const { data } = useSWR("/api/v1/orders/admin/all?limit=100", fetcher);
+  const RECENT_ORDERS = (data?.orders || []).map((o: any) => ({
+    id: o.orderId, customer: o.userId?.name || "Unknown", city: o.address?.city || "—",
+    amount: o.total, status: STATUS_LABEL[o.status] || o.status, payment: (o.paymentMethod||"").toUpperCase(),
+    items: (o.items || []).length, time: new Date(o.createdAt).toLocaleTimeString("en-IN", { hour:"numeric", minute:"2-digit" }),
+    icon: iconFor(o.orderId),
+  }));
+
   const [search,   setSearch]   = useState("");
   const [filter,   setFilter]   = useState("All");
-  const [selected, setSelected] = useState<typeof RECENT_ORDERS[number] | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
   const [page,     setPage]     = useState(1);
   const PER_PAGE = 6;
 
@@ -409,8 +383,20 @@ function OrdersView() {
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
 function UsersView() {
+  const { data } = useSWR("/api/v1/auth/admin/users?limit=100", fetcher);
+  const TIER_LABEL: Record<string,string> = { bronze:"New", silver:"Silver", gold:"Gold", platinum:"Platinum" };
+  const USERS = (data?.users || []).map((u: any) => ({
+    id: u._id, name: u.name, email: u.email || "—", phone: u.phone, city: "—",
+    orders: u.orders, spend: u.spend,
+    status: u.status === "blocked" ? "Blocked" : (u.orders > 0 ? "Active" : "Inactive"),
+    tier: TIER_LABEL[u.loyaltyTier] || "New",
+    joined: new Date(u.createdAt).toLocaleDateString("en-GB", { month:"short", year:"numeric" }),
+    lastOrder: u.lastOrder ? new Date(u.lastOrder).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }) : "—",
+    avatar: (u.name || "?")[0].toUpperCase(),
+  }));
+
   const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState<typeof USERS[number] | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
   const [tierFilter, setTierFilter] = useState("All");
 
   const tiers = ["All","New","Silver","Gold","Platinum","Blocked"];

@@ -1,7 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import useSWR from "swr";
 import RequireAuth from "../_components/RequireAuth";
+import { api } from "../_lib/api";
+
+// Adapts a real backend Coupon doc (Mongo shape: _id, minOrderValue, no
+// desc/applicableTo/category/festivalTag) into the UI shape this page was
+// built around, so nothing below this line needs to change.
+function adaptCoupon(c: any) {
+  return {
+    id: c._id, code: c.code, type: c.type, value: c.value, maxDiscount: c.maxDiscount || 0,
+    minOrder: c.minOrderValue || 0, usageLimit: c.usageLimit ?? null, usedCount: c.usedCount || 0,
+    isActive: c.isActive, expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
+    desc: c.desc || "", applicableTo: "all", category: "", festivalTag: "",
+    createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "",
+  };
+}
+const fetcher = (url: string) => api.get<{ data: { coupons: any[] } }>(url).then(r => r.data.coupons.map(adaptCoupon));
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const C = {
@@ -23,22 +39,14 @@ const C = {
 };
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const INIT_COUPONS = [
-  { id:"c1", code:"WELCOME100",  type:"flat",    value:100,  maxDiscount:100,  minOrder:299,  usageLimit:1,    usedCount:0,   isActive:true,  expiresAt:"2026-12-31", desc:"₹100 off first order",         applicableTo:"all",      category:"",         festivalTag:"",        createdAt:"1 Jan 2026" },
-  { id:"c2", code:"DIWALI20",    type:"percent", value:20,   maxDiscount:200,  minOrder:500,  usageLimit:500,  usedCount:187, isActive:true,  expiresAt:"2026-11-05", desc:"20% off — Diwali special",      applicableTo:"all",      category:"",         festivalTag:"Diwali",  createdAt:"1 Oct 2026" },
-  { id:"c3", code:"NAVRATRI25",  type:"percent", value:25,   maxDiscount:300,  minOrder:699,  usageLimit:300,  usedCount:300, isActive:false, expiresAt:"2026-10-11", desc:"25% off for Navratri",           applicableTo:"category", category:"festival-kits", festivalTag:"Navratri",createdAt:"1 Sep 2026" },
-  { id:"c4", code:"FREESHIP",    type:"shipping",value:0,    maxDiscount:0,    minOrder:0,    usageLimit:1000, usedCount:412, isActive:true,  expiresAt:"2026-12-31", desc:"Free shipping on any order",     applicableTo:"all",      category:"",         festivalTag:"",        createdAt:"1 Jun 2026" },
-  { id:"c5", code:"HAWAN30",     type:"percent", value:30,   maxDiscount:150,  minOrder:499,  usageLimit:200,  usedCount:89,  isActive:true,  expiresAt:"2026-12-31", desc:"30% off on hawan products",     applicableTo:"category", category:"hawan-materials",festivalTag:"",   createdAt:"15 Jun 2026"},
-  { id:"c7", code:"BULK499",     type:"flat",    value:499,  maxDiscount:499,  minOrder:2999, usageLimit:100,  usedCount:12,  isActive:true,  expiresAt:"2026-12-31", desc:"₹499 off orders above ₹2999",   applicableTo:"all",      category:"",         festivalTag:"",        createdAt:"1 Jun 2026" },
-  { id:"c8", code:"GHEE10",      type:"percent", value:10,   maxDiscount:80,   minOrder:249,  usageLimit:null, usedCount:203, isActive:true,  expiresAt:"2026-12-31", desc:"10% off on ghee & oils",        applicableTo:"category", category:"ghee-oils", festivalTag:"",        createdAt:"10 Jun 2026"},
-];
-
-const COUPON_STATS = [
-  { label:"Total Coupons",    value:INIT_COUPONS.length,                              icon:"🏷️", color:C.saffron  },
-  { label:"Active",           value:INIT_COUPONS.filter(c=>c.isActive).length,        icon:"✅", color:C.green    },
-  { label:"Total Uses",       value:INIT_COUPONS.reduce((s,c)=>s+c.usedCount,0),     icon:"👆", color:C.blue     },
-  { label:"Discount Given",   value:"₹38,400",                                        icon:"💸", color:C.red      },
-];
+function couponStats(coupons: any[] = []) {
+  return [
+    { label:"Total Coupons",    value: coupons.length,                                     icon:"🏷️", color:C.saffron  },
+    { label:"Active",           value: coupons.filter(c=>c.isActive).length,                icon:"✅", color:C.green    },
+    { label:"Total Uses",       value: coupons.reduce((s,c)=>s+c.usedCount,0),               icon:"👆", color:C.blue     },
+    { label:"Discount Given",   value:"—",                                                   icon:"💸", color:C.red      },
+  ];
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function calcDiscount(coupon, orderValue) {
@@ -299,18 +307,19 @@ function CouponForm({ initial, onSave, onCancel }) {
 
 // ─── CUSTOMER COUPON APPLY UI ─────────────────────────────────────────────────
 function CustomerCouponApply({ orderValue=799 }) {
+  const { data: allCoupons } = useSWR("/api/v1/coupons?limit=100", fetcher, { fallbackData: [] });
   const [input,    setInput]    = useState("");
-  const [applied,  setApplied]  = useState<typeof INIT_COUPONS[number] | null>(null);
+  const [applied,  setApplied]  = useState<any | null>(null);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
   const [showList, setShowList] = useState(false);
 
-  const publicCoupons = INIT_COUPONS.filter(c=>c.isActive && new Date(c.expiresAt)>=new Date() && (c.usageLimit===null||c.usedCount<c.usageLimit));
+  const publicCoupons = (allCoupons || []).filter(c=>c.isActive && new Date(c.expiresAt)>=new Date() && (c.usageLimit===null||c.usedCount<c.usageLimit));
 
   const apply = (code) => {
     setError(""); setLoading(true);
     setTimeout(()=>{
-      const coupon = INIT_COUPONS.find(c=>c.code===code.trim().toUpperCase());
+      const coupon = (allCoupons || []).find(c=>c.code===code.trim().toUpperCase());
       if (!coupon)           { setError("Invalid coupon code. Please check and try again."); setLoading(false); return; }
       if (!coupon.isActive)  { setError("This coupon is currently paused."); setLoading(false); return; }
       if (new Date(coupon.expiresAt)<new Date()) { setError("This coupon has expired."); setLoading(false); return; }
@@ -409,17 +418,17 @@ function CustomerCouponApply({ orderValue=799 }) {
 
 // ─── ADMIN COUPONS VIEW ───────────────────────────────────────────────────────
 function AdminCoupons() {
-  const [coupons, setCoupons]   = useState(INIT_COUPONS);
+  const { data: coupons, mutate } = useSWR("/api/v1/coupons?limit=100", fetcher, { fallbackData: [] });
   const [filter,  setFilter]    = useState("All");
   const [search,  setSearch]    = useState("");
   const [showForm,setShowForm]  = useState(false);
-  const [editing, setEditing]   = useState<typeof INIT_COUPONS[number] | null>(null);
+  const [editing, setEditing]   = useState<any | null>(null);
   const [selected,setSelected]  = useState<string | null>(null);
 
   const filters = ["All","Active","Paused","Expired","Festival"];
   const isExpired = c => new Date(c.expiresAt) < new Date();
 
-  const filtered = coupons.filter(c=>{
+  const filtered = (coupons || []).filter(c=>{
     if (filter==="Active"  && (!c.isActive||isExpired(c))) return false;
     if (filter==="Paused"  && c.isActive)                  return false;
     if (filter==="Expired" && !isExpired(c))               return false;
@@ -428,14 +437,28 @@ function AdminCoupons() {
     return true;
   });
 
-  const toggle  = (id) => setCoupons(prev=>prev.map(c=>c.id===id?{...c,isActive:!c.isActive}:c));
-  const remove  = (id) => setCoupons(prev=>prev.filter(c=>c.id!==id));
-  const save    = (form) => {
+  const toggle  = async (id) => {
+    const c = (coupons || []).find(x => x.id === id);
+    await api.patch(`/api/v1/coupons/${id}`, { isActive: !c.isActive });
+    mutate();
+  };
+  const remove  = async (id) => {
+    await api.delete(`/api/v1/coupons/${id}`);
+    mutate();
+  };
+  const save    = async (form) => {
+    const payload = {
+      code: form.code, desc: form.desc, type: form.type, value: form.value,
+      maxDiscount: form.maxDiscount || undefined, minOrderValue: form.minOrder || 0,
+      usageLimit: form.usageLimit || undefined, isActive: form.isActive,
+      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
+    };
     if (editing?.id) {
-      setCoupons(prev=>prev.map(c=>c.id===editing.id?{...c,...form}:c));
+      await api.patch(`/api/v1/coupons/${editing.id}`, payload);
     } else {
-      setCoupons(prev=>[{...form,id:`c${Date.now()}`,usedCount:0,createdAt:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})},...prev]);
+      await api.post(`/api/v1/coupons`, payload);
     }
+    mutate();
     setShowForm(false); setEditing(null);
   };
 
@@ -443,7 +466,7 @@ function AdminCoupons() {
     <div>
       {/* Stats */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24 }}>
-        {COUPON_STATS.map(s=>(
+        {couponStats(coupons).map(s=>(
           <Card key={s.label} style={{ padding:"16px 18px" }}>
             <div style={{ fontSize:22,marginBottom:6 }}>{s.icon}</div>
             <div style={{ fontSize:22,fontWeight:700,color:s.color }}>{s.value}</div>
@@ -516,6 +539,7 @@ const NAV = [
 
 export default function CouponsModule() {
   const [view, setView] = useState("admin");
+  const { data: sidebarCoupons } = useSWR("/api/v1/coupons?limit=100", fetcher, { fallbackData: [] });
 
   return (
     <RequireAuth>
@@ -540,7 +564,7 @@ export default function CouponsModule() {
           ))}
         </div>
         <div style={{ padding:"14px",borderTop:`1px solid ${C.sbBorder}`,fontSize:11,color:C.sbDim,textAlign:"center" }}>
-          {INIT_COUPONS.filter(c=>c.isActive).length} active coupons live
+          {(sidebarCoupons || []).filter(c=>c.isActive).length} active coupons live
         </div>
       </div>
 

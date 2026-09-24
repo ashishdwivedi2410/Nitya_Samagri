@@ -19,6 +19,8 @@ import reviewRoutes       from "./modules/reviews/review.routes";
 import orderRoutes        from "./modules/orders/order.routes";
 import paymentRoutes      from "./modules/payments/payment.routes";
 import integrationsRoutes from "./integrations/integrations.routes";
+import couponRoutes        from "./modules/coupons/coupon.routes";
+import cmsRoutes           from "./modules/cms/cms.routes";
 
 // This file builds and exports the Express app only — it never binds a port,
 // creates an HTTP server, or opens the WebSocket server. That work belongs to
@@ -63,6 +65,8 @@ app.use(`${API}/reviews`,      reviewRoutes);
 app.use(`${API}/orders`,       orderRoutes);
 app.use(`${API}/payments`,     paymentRoutes);
 app.use(`${API}/integrations`, integrationsRoutes);
+app.use(`${API}/coupons`,      couponRoutes);
+app.use(`${API}/cms`,          cmsRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);

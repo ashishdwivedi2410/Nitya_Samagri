@@ -14,6 +14,7 @@ const ADMIN = ["admin", "super_admin"];
 
 const CouponSchema = z.object({
   code: z.string().min(3).max(30),
+  desc: z.string().max(200).optional(),
   type: z.enum(["percent", "flat"]),
   value: z.number().positive(),
   maxDiscount: z.number().positive().optional(),

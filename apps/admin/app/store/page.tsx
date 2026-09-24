@@ -1,8 +1,16 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
 import RequireAuth from "../_components/RequireAuth";
+import { api } from "../_lib/api";
+
+const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" }) : "";
+const cmsFetcher = (url: string) => api.get<{ data: { items: any[] } }>(url).then(r => r.data.items);
+const cmsCreate = (resource: string, body: unknown) => api.post(`/api/v1/cms/${resource}`, body);
+const cmsUpdate = (resource: string, id: string, body: unknown) => api.patch(`/api/v1/cms/${resource}/${id}`, body);
+const cmsDelete = (resource: string, id: string) => api.delete(`/api/v1/cms/${resource}/${id}`);
 
 // ─── THEME: Dark obsidian sidebar + warm ivory content ────────────────────────
 const S = {
@@ -47,50 +55,6 @@ const S = {
 };
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const BANNERS = [
-  { id:"b1", title:"Navratri Mega Sale",    desktop:"🪔", mobile:"🪔", cta:"Shop Now",   url:"/navratri",  status:"active",   start:"1 Oct 2026",  end:"10 Oct 2026", clicks:1240 },
-  { id:"b2", title:"Pure Cow Ghee Launch",  desktop:"🫙", mobile:"🫙", cta:"Buy Now",    url:"/ghee",      status:"active",   start:"1 Jun 2026",  end:"30 Jun 2026", clicks:876  },
-  { id:"b4", title:"Diwali Collection 2026",desktop:"✨", mobile:"✨", cta:"Explore",    url:"/diwali",    status:"draft",    start:"15 Oct 2026", end:"5 Nov 2026",  clicks:0    },
-];
-
-const FESTIVALS = [
-  { id:"f1", name:"Navratri 2026",     icon:"🪔", startDate:"2 Oct 2026",  endDate:"11 Oct 2026", status:"upcoming", products:42, revenue:0,     color:"#D4270C" },
-  { id:"f2", name:"Diwali 2026",       icon:"✨", startDate:"20 Oct 2026", endDate:"24 Oct 2026", status:"draft",    products:68, revenue:0,     color:"#C8860A" },
-  { id:"f3", name:"Janmashtami 2026",  icon:"🦚", startDate:"15 Aug 2026", endDate:"16 Aug 2026", status:"draft",    products:28, revenue:0,     color:"#1A5C9E" },
-  { id:"f4", name:"Shivratri 2026",    icon:"🔱", startDate:"19 Feb 2026", endDate:"20 Feb 2026", status:"completed",products:35, revenue:420000,color:"#6B2EA8" },
-  { id:"f5", name:"Ram Navami 2026",   icon:"🏹", startDate:"6 Apr 2026",  endDate:"6 Apr 2026",  status:"completed",products:22, revenue:185000,color:"#1A7A3C" },
-];
-
-const BLOGS = [
-  { id:"bl1", title:"Complete Guide to Navratri Puja Vidhi",        category:"Festivals",   status:"published", views:8420, date:"28 May 2026", author:"Admin",    tags:["navratri","puja"] },
-  { id:"bl2", title:"Why Pure A2 Cow Ghee is Essential for Havan",  category:"Products",    status:"published", views:5210, date:"22 May 2026", author:"Admin",    tags:["ghee","havan"] },
-  { id:"bl3", title:"How to Perform Griha Pravesh: Step by Step",   category:"Ceremonies",  status:"published", views:3890, date:"15 May 2026", author:"Admin",    tags:["griha pravesh"] },
-  { id:"bl4", title:"Benefits of Rudrabhishek: Ancient Wisdom",     category:"Spirituality",status:"draft",     views:0,    date:"30 May 2026", author:"Admin",    tags:["rudrabhishek"] },
-  { id:"bl5", title:"Diwali 2026: Best Puja Kits & Decoration Ideas",category:"Festivals",  status:"draft",     views:0,    date:"1 Jun 2026",  author:"Admin",    tags:["diwali","kits"] },
-];
-
-const SECTIONS = [
-  { id:"s1", label:"Hero Banner",        active:true,  sortOrder:1, type:"banner"   },
-  { id:"s2", label:"Festival Collections",active:true, sortOrder:2, type:"festival" },
-  { id:"s3", label:"Featured Products",  active:true,  sortOrder:3, type:"products" },
-  { id:"s4", label:"Best Sellers",       active:true,  sortOrder:4, type:"products" },
-  { id:"s6", label:"New Arrivals",       active:false, sortOrder:6, type:"products" },
-  { id:"s7", label:"Testimonials",       active:true,  sortOrder:7, type:"reviews"  },
-  { id:"s8", label:"Blog Section",       active:false, sortOrder:8, type:"blog"     },
-];
-
-const ANNOUNCEMENTS = [
-  { id:"a1", text:"🚚 Free delivery on orders above ₹499", active:true,  start:"1 Jun 2026", end:"30 Jun 2026", bg:S.saffron, color:S.white },
-  { id:"a2", text:"🪔 Navratri Special Kits — Order Now!",  active:false, start:"1 Oct 2026", end:"10 Oct 2026",bg:"#8B1A1A", color:S.white },
-  { id:"a3", text:"✨ Same-day dispatch on orders before 2PM",active:true, start:"1 Jun 2026", end:"31 Dec 2026",bg:S.gold,    color:S.white },
-];
-
-const SEO_PAGES = [
-  { id:"sp1", page:"Homepage",           title:"nityasamagri — Pure Puja Samagri Online",                          desc:"Order temple-grade puja items delivered to your door.",  score:92 },
-  { id:"sp2", page:"Puja Samagri",       title:"Buy Pure Puja Samagri Online | nityasamagri",                         desc:"Shop authentic puja items delivered to your door.",       score:87 },
-  { id:"sp4", page:"Cow Ghee",           title:"Buy Pure A2 Cow Ghee for Puja Online",                             desc:"Bilona method A2 ghee for havan, deepak & cooking.",     score:95 },
-  { id:"sp5", page:"Hawan Samagri",      title:"Hawan Samagri Kit Online | Pure Ingredients",                      desc:"Complete havan kits with all required ingredients.",      score:81 },
-];
 
 // ─── SHARED ───────────────────────────────────────────────────────────────────
 function StatusPill({ status }) {
@@ -151,7 +115,10 @@ function Toggle({ on, onChange }) {
 
 // ─── HOMEPAGE CMS ─────────────────────────────────────────────────────────────
 function HomepageCMS() {
-  const [sections, setSections] = useState(SECTIONS);
+  const { data, mutate } = useSWR("/api/v1/cms/sections", cmsFetcher, { fallbackData: [] });
+  const initial = (data || []).map((s: any) => ({ id: s._id, label: s.label, type: s.type, active: s.active, order: s.sortOrder }));
+  const [sections, setSections] = useState(initial);
+  useEffect(() => { if (data) setSections(initial); }, [data]);
   const [dragging, setDragging] = useState(null);
   const [saved, setSaved] = useState(false);
 
@@ -176,7 +143,11 @@ function HomepageCMS() {
     });
   };
 
-  const save = () => { setSaved(true); setTimeout(()=>setSaved(false), 2000); };
+  const save = async () => {
+    await Promise.all(sections.map((s: any, i: number) => cmsUpdate("sections", s.id, { active: s.active, sortOrder: i })));
+    mutate();
+    setSaved(true); setTimeout(()=>setSaved(false), 2000);
+  };
 
   const typeIcon = { banner:"🖼️", festival:"🪔", products:"📦", reviews:"⭐", blog:"📝" };
 
@@ -243,13 +214,22 @@ function HomepageCMS() {
 
 // ─── BANNERS ──────────────────────────────────────────────────────────────────
 function BannersView() {
-  const [banners, setBanners] = useState(BANNERS);
+  const { data, mutate } = useSWR("/api/v1/cms/banners", cmsFetcher, { fallbackData: [] });
+  const banners = (data || []).map((b: any) => ({ id: b._id, title: b.title, desktop: b.desktopEmoji || "🖼️", mobile: b.mobileEmoji || "🖼️", cta: b.cta, url: b.url, status: b.status, start: fmtDate(b.startDate), end: fmtDate(b.endDate), clicks: b.clicks || 0 }));
   const [editing, setEditing] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title:"", cta:"Shop Now", url:"", start:"", end:"", status:"draft" });
 
-  const toggleStatus = (id) => {
-    setBanners(prev=>prev.map(b=>b.id===id ? {...b, status:b.status==="active"?"draft":"active"} : b));
+  const toggleStatus = async (id) => {
+    const b = banners.find(x => x.id === id);
+    await cmsUpdate("banners", id, { status: b.status === "active" ? "draft" : "active" });
+    mutate();
+  };
+  const saveBanner = async () => {
+    await cmsCreate("banners", { title: form.title, cta: form.cta, url: form.url, status: form.status });
+    setForm({ title:"", cta:"Shop Now", url:"", start:"", end:"", status:"draft" });
+    setShowForm(false);
+    mutate();
   };
 
   return (
@@ -300,7 +280,7 @@ function BannersView() {
             ))}
           </div>
           <div style={{ display:"flex", gap:10, marginTop:16 }}>
-            <Btn>Save Banner</Btn>
+            <Btn onClick={saveBanner}>Save Banner</Btn>
             <Btn variant="secondary" onClick={()=>setShowForm(false)}>Cancel</Btn>
           </div>
         </Card>
@@ -345,8 +325,9 @@ function BannersView() {
 
 // ─── FESTIVAL CAMPAIGNS ───────────────────────────────────────────────────────
 function FestivalsView() {
-  const [festivals, setFestivals] = useState(FESTIVALS);
-  const [selected, setSelected] = useState<typeof FESTIVALS[number] | null>(null);
+  const { data } = useSWR("/api/v1/cms/festivals", cmsFetcher, { fallbackData: [] });
+  const festivals = (data || []).map((f: any) => ({ id: f._id, name: f.name, icon: f.icon || "🪔", color: f.color || S.saffron, status: f.status, start: fmtDate(f.startDate), end: fmtDate(f.endDate), products: (f.productIds||[]).length, revenue: f.revenue || 0 }));
+  const [selected, setSelected] = useState<any | null>(null);
   const [showNew, setShowNew] = useState(false);
 
   return (
@@ -476,11 +457,19 @@ function FestivalsView() {
 
 // ─── BLOG ─────────────────────────────────────────────────────────────────────
 function BlogView() {
-  const [blogs, setBlogs] = useState(BLOGS);
+  const { data, mutate } = useSWR("/api/v1/cms/blogs", cmsFetcher, { fallbackData: [] });
+  const blogs = (data || []).map((b: any) => ({ id: b._id, title: b.title, category: b.category || "Products", excerpt: b.excerpt || "", author: b.author || "Admin", status: b.status === "published" ? "Published" : "Draft", views: b.views || 0, date: fmtDate(b.publishedAt || b.createdAt) }));
   const [filter, setFilter] = useState("All");
   const [writing, setWriting] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
+
+  const slug = (draftTitle||"post-title").toLowerCase().replace(/[^a-z0-9]+/g,"-");
+  const publish = async (status: "draft" | "published") => {
+    await cmsCreate("blogs", { title: draftTitle, slug, content: draftBody, status });
+    setDraftTitle(""); setDraftBody(""); setWriting(false);
+    mutate();
+  };
 
   const categories = ["All","Festivals","Products","Ceremonies","Spirituality"];
   const filtered = filter==="All" ? blogs : blogs.filter(b=>b.category===filter);
@@ -520,8 +509,8 @@ function BlogView() {
             <div style={{ fontSize:13, color:S.textMid }}>Meta description will be auto-generated from the first 160 characters of your content.</div>
           </div>
           <div style={{ display:"flex", gap:10, marginTop:14 }}>
-            <Btn>Publish Post</Btn>
-            <Btn variant="secondary">Save Draft</Btn>
+            <Btn onClick={()=>publish("published")}>Publish Post</Btn>
+            <Btn variant="secondary" onClick={()=>publish("draft")}>Save Draft</Btn>
             <Btn variant="secondary" onClick={()=>setWriting(false)}>Cancel</Btn>
           </div>
         </Card>
@@ -568,12 +557,14 @@ function BlogView() {
 
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 function SEOView() {
-  const [pages, setPages] = useState(SEO_PAGES);
+  const { data, mutate } = useSWR("/api/v1/cms/seo-pages", cmsFetcher, { fallbackData: [] });
+  const pages = (data || []).map((p: any) => ({ id: p._id, page: p.page, title: p.title, desc: p.desc || "", score: p.score ?? 0 }));
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<{ title?: string; desc?: string }>({});
 
   const scoreColor = s => s>=90?S.green:s>=75?S.marigold:S.red;
   const startEdit = (p) => { setEditing(p.id); setForm({ title:p.title, desc:p.desc }); };
+  const saveEdit = async (id: string) => { await cmsUpdate("seo-pages", id, form); setEditing(null); mutate(); };
 
   return (
     <div>
@@ -614,7 +605,7 @@ function SEOView() {
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                  <Btn small onClick={()=>setEditing(null)}>Save</Btn>
+                  <Btn small onClick={()=>saveEdit(p.id)}>Save</Btn>
                   <Btn variant="secondary" small onClick={()=>setEditing(null)}>Cancel</Btn>
                 </div>
               </div>
@@ -665,12 +656,22 @@ function SEOView() {
 
 // ─── ANNOUNCEMENTS ────────────────────────────────────────────────────────────
 function AnnouncementsView() {
-  const [announcements, setAnnouncements] = useState(ANNOUNCEMENTS);
+  const { data, mutate } = useSWR("/api/v1/cms/announcements", cmsFetcher, { fallbackData: [] });
+  const announcements = (data || []).map((a: any) => ({ id: a._id, text: a.text, active: a.active, bg: a.bg || S.saffron, color: a.color || "#fff" }));
   const [showNew, setShowNew] = useState(false);
   const [newText, setNewText] = useState("");
   const [newBg, setNewBg] = useState(S.saffron);
 
-  const toggle = (id) => setAnnouncements(prev=>prev.map(a=>a.id===id?{...a,active:!a.active}:a));
+  const toggle = async (id) => {
+    const a = announcements.find(x => x.id === id);
+    await cmsUpdate("announcements", id, { active: !a.active });
+    mutate();
+  };
+  const addAnnouncement = async () => {
+    await cmsCreate("announcements", { text: newText, bg: newBg, active: true });
+    setNewText(""); setShowNew(false);
+    mutate();
+  };
 
   return (
     <div>
@@ -715,7 +716,7 @@ function AnnouncementsView() {
             <div style={{ marginTop:12, background:newBg, color:S.white, textAlign:"center", padding:"9px", borderRadius:8, fontSize:13, fontWeight:500 }}>{newText}</div>
           )}
           <div style={{ display:"flex", gap:10, marginTop:12 }}>
-            <Btn>Add Announcement</Btn>
+            <Btn onClick={addAnnouncement}>Add Announcement</Btn>
             <Btn variant="secondary" onClick={()=>setShowNew(false)}>Cancel</Btn>
           </div>
         </Card>

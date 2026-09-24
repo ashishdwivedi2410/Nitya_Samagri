@@ -563,7 +563,9 @@ router.get(
     today.setHours(0, 0, 0, 0);
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const [totalOrders, todayOrders, monthRevenueAgg, statusCounts, paymentSplit] = await Promise.all([
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+    const [totalOrders, todayOrders, monthRevenueAgg, statusCounts, paymentSplit, revenueTrend, topProducts, categoryPerf] = await Promise.all([
       Order.countDocuments(),
       Order.countDocuments({ createdAt: { $gte: today } }),
       Order.aggregate([
@@ -572,6 +574,25 @@ router.get(
       ]),
       Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
       Order.aggregate([{ $group: { _id: "$paymentMethod", count: { $sum: 1 } } }]),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: sixMonthsAgo }, paymentStatus: "paid" } },
+        { $group: { _id: { y: { $year: "$createdAt" }, m: { $month: "$createdAt" } }, revenue: { $sum: "$total" }, orders: { $sum: 1 } } },
+        { $sort: { "_id.y": 1, "_id.m": 1 } },
+      ]),
+      OrderItem.aggregate([
+        { $group: { _id: "$productId", name: { $first: "$productName" }, qtySold: { $sum: "$qty" }, revenue: { $sum: "$total" } } },
+        { $sort: { qtySold: -1 } },
+        { $limit: 10 },
+      ]),
+      OrderItem.aggregate([
+        { $lookup: { from: "products", localField: "productId", foreignField: "_id", as: "product" } },
+        { $unwind: "$product" },
+        { $lookup: { from: "categories", localField: "product.categoryId", foreignField: "_id", as: "category" } },
+        { $unwind: "$category" },
+        { $group: { _id: "$category.name", revenue: { $sum: "$total" }, qtySold: { $sum: "$qty" } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 10 },
+      ]),
     ]);
 
     res.json({
@@ -582,6 +603,9 @@ router.get(
         monthRevenue: monthRevenueAgg[0]?.total || 0,
         statusCounts: Object.fromEntries(statusCounts.map((s) => [s._id, s.count])),
         paymentSplit: Object.fromEntries(paymentSplit.map((p) => [p._id, p.count])),
+        revenueTrend: revenueTrend.map((r) => ({ month: `${r._id.y}-${String(r._id.m).padStart(2, "0")}`, revenue: r.revenue, orders: r.orders })),
+        topProducts,
+        categoryPerf,
       },
     });
   })
