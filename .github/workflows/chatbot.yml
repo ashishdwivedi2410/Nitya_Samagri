@@ -104,3 +104,5 @@ jobs:
             docker compose -f docker/docker-compose.prod.yml pull chatbot
             docker compose -f docker/docker-compose.prod.yml up -d chatbot
             ./scripts/health-check.sh chatbot
+
+            
