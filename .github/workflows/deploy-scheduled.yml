@@ -127,8 +127,11 @@ jobs:
 
             sleep 20
 
-            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
-              exec -T api_$IDLE npx prisma migrate deploy
+            # No migration step here: this is Mongoose/MongoDB, not Prisma —
+            # there's no schema.prisma and no migration runner wired up yet.
+            # Mongoose builds indexes lazily on first use; see
+            # src/database/indexes.ts::ensureIndexes() if you want an
+            # explicit post-deploy index sync instead.
 
             echo "🔎 Green-testing the idle ($IDLE) containers directly — no public traffic involved yet."
             docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
@@ -218,5 +221,3 @@ jobs:
         if: failure()
         run: |
           echo "::error::Scheduled deploy failed. If this happened before cutover, production was never affected. If it happened after cutover (rare), nginx has been rolled back to the previous color — check the 'Clean up failed idle deploy' step's log above to see which case this was."
-
-          

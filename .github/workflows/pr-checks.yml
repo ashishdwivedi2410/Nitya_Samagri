@@ -30,7 +30,6 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: npm run lint || true
 
@@ -140,5 +139,3 @@ jobs:
             } catch(e) {
               console.log('Could not post comment:', e.message);
             }
-
-            

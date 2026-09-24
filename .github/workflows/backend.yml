@@ -34,7 +34,6 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npx prisma generate
       - run: npx tsc --noEmit
 
   # ── Test ──────────────────────────────────────────────────────────────────────
@@ -47,15 +46,11 @@ jobs:
         working-directory: backend
 
     services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB:       nityasamagri_test
-          POSTGRES_USER:     postgres
-          POSTGRES_PASSWORD: test_password
-        ports: ["5432:5432"]
+      mongodb:
+        image: mongo:7
+        ports: ["27017:27017"]
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -70,7 +65,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL:           postgresql://postgres:test_password@localhost:5432/nityasamagri
+      MONGO_URI:              mongodb://localhost:27017/nityasamagri_test
       REDIS_HOST:             localhost
       REDIS_PORT:             "6379"
       REDIS_PASSWORD:         ""
@@ -95,8 +90,6 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npx prisma generate
-      - run: npx prisma migrate deploy
       - run: npm test --if-present
 
   # ── Build & Push Docker Image ─────────────────────────────────────────────────
@@ -171,10 +164,11 @@ jobs:
             sleep 15
             curl -sf https://api.adminns.in/health || exit 1
 
-            # Run migrations
-            docker compose -f devops/docker-compose.yml \
-                           -f devops/docker-compose.prod.yml \
-                           exec -T api npx prisma migrate deploy
+            # No migration step here: this is Mongoose/MongoDB, not Prisma —
+            # there's no schema.prisma and no migration runner wired up yet.
+            # Mongoose builds indexes lazily on first use; see
+            # src/database/indexes.ts::ensureIndexes() if you want an
+            # explicit post-deploy index sync instead.
 
             # Cleanup
             docker image prune -f
@@ -189,4 +183,3 @@ jobs:
           SKIP_ADMIN:              "1"
           SMOKE_TEST_RETRIES:      "6"
           SMOKE_TEST_RETRY_DELAY:  "8"
-          
