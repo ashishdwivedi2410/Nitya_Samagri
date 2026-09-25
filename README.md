@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://postgresql.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-7-green.svg)](https://mongodb.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://typescriptlang.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://docker.com)
  
@@ -45,7 +45,7 @@ nityasamagri is a **production-grade, full-stack spiritual e-commerce platform**
 - 🙏 **Pandit Booking** — Book verified pandits for 20+ ceremony types
 - 📦 **Puja Packages** — One checkout: Pandit + Samagri delivered together
 - 💳 **Payments** — Razorpay, UPI, COD, Cards, Wallets + webhook verification
-- 🚚 **Delivery** — Shiprocket, Delhivery, Dunzo, Own Courier with slot scheduling
+- 🚚 **Delivery** — Eshopbox, Own Courier with slot scheduling
 - 📡 **Real-time** — WebSocket order updates to customers and admins
 - 🪔 **Festival Campaigns** — Navratri, Diwali, Janmashtami, Shivratri and more
 - 📊 **Analytics** — Revenue, GST, inventory, customer LTV, festival performance
@@ -81,7 +81,7 @@ WebSocket            →  wss://api.adminns.in/ws
 | Runtime | Node.js 20 |
 | Framework | Express.js |
 | Language | TypeScript |
-| ORM | Prisma 5 |
+| ODM | Mongoose 8 |
 | Validation | Zod |
 | Auth | JWT + bcrypt |
 | Real-time | WebSocket (ws) |
@@ -90,24 +90,23 @@ WebSocket            →  wss://api.adminns.in/ws
 ### Infrastructure
 | Layer | Technology |
 |-------|-----------|
-| Database | PostgreSQL 16 |
+| Database | MongoDB 7 |
 | Cache | Redis 7 |
 | Media | AWS S3 + CloudFront |
 | Proxy | Nginx |
 | Containers | Docker |
 | CI/CD | GitHub Actions |
-| Hosting | AWS LightSail|
+| Hosting | AWS EC2 (see Terraform in `devops/terraform/`) |
 | SSL | Let's Encrypt (Certbot) |
  
 ### Integrations
 | Service | Purpose |
 |---------|---------|
 | Razorpay | Payments, refunds, webhooks |
-| Shiprocket | Shipping, AWB, tracking |
-| Delhivery | Alternative courier |
-| Dunzo | Same-day delivery |
-| Twilio | SMS (OTP + order updates) |
-| SendGrid | Transactional emails |
+| Eshopbox | Shipping, AWB, tracking (replaces Shiprocket) |
+| Firebase Auth | Phone OTP login (client sends the SMS, backend verifies the ID token) |
+| Twilio | Order-status SMS updates only — no longer used for OTP |
+| Gmail SMTP (Nodemailer) | Transactional emails (replaces SendGrid) |
 | WhatsApp Business API | Order notifications |
 | Google Analytics 4 | Web analytics |
 | Meta Pixel | Ad tracking |
@@ -147,15 +146,16 @@ nityasamagri/                          # Monorepo root (Turborepo)
 │   │       ├── orders/             # Order management
 │   │       ├── products/           # Product catalog
 │   │       └── payments/           # Razorpay integration
-│   └── prisma/
-│       └── schema.prisma           # Database schema (22 models)
+│   └── database/
+│       └── models/                 # Mongoose schemas (22 models)
 │
-├── docker/
+├── devops/
+│   ├── docker/
+│   │   ├── docker-compose.dev.yml  # Local development
+│   │   └── docker-compose.prod.yml # Production overrides
 │   └── nginx/
-│       └── nginx.prod.conf         # Production Nginx config
+│       └── nginx.conf              # Nginx config (blue/green via nginx/active/)
 │
-├── docker-compose.yml              # Local development
-├── docker-compose.prod.yml         # Production overrides
 ├── turbo.json                      # Monorepo build pipeline
 └── README.md
 ```
@@ -214,13 +214,11 @@ cp backend/.env.example backend/.env
 ### 3. Start with Docker (recommended)
 ```bash
 # Start all services
-docker compose up -d
+docker compose -f devops/docker/docker-compose.dev.yml up -d
  
-# Run database migrations
-docker compose exec api npx prisma migrate dev
- 
-# Seed sample data
-docker compose exec api npm run seed
+# Seed sample data (no separate migration step needed — Mongoose
+# builds/validates collections against the schemas on connect)
+docker compose -f devops/docker/docker-compose.dev.yml exec api npm run seed
 ```
  
 ### 4. Access the apps
@@ -240,12 +238,11 @@ cd backend && npm install
 cd ../apps/web && npm install
 cd ../admin && npm install
  
-# Start PostgreSQL and Redis locally
+# Start MongoDB and Redis locally
 # then:
  
 # Terminal 1 — API
 cd backend
-npx prisma migrate dev
 npm run dev
  
 # Terminal 2 — Customer web
@@ -270,7 +267,7 @@ PORT=4000
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002
  
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/nityasamagri
+MONGO_URI=mongodb://nityasamagri:password@localhost:27017/nityasamagri?authSource=admin
  
 # Redis
 REDIS_HOST=localhost
@@ -288,14 +285,26 @@ RAZORPAY_KEY_ID=rzp_test_XXXXXXXXXXXXXXXX
 RAZORPAY_KEY_SECRET=XXXXXXXXXXXXXXXXXXXXXXXX
 RAZORPAY_WEBHOOK_SECRET=XXXXXXXXXXXXXXXXXXXXXXXX
  
-# Twilio (SMS / OTP)
+# Firebase (phone OTP auth — client sends the SMS, backend verifies the
+# ID token via Firebase Admin SDK)
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nXXXX\n-----END PRIVATE KEY-----\n"
+ 
+# Twilio (order-status SMS only — OTP is handled by Firebase above)
 TWILIO_SID=ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 TWILIO_TOKEN=your_auth_token
 TWILIO_PHONE=+1XXXXXXXXXX
  
-# SendGrid (Email)
-SENDGRID_API_KEY=SG.XXXXXXXXXXXXXXXXXXXXXXXX
-SENDGRID_FROM_EMAIL=noreply@nityasamagri.in
+# Gmail SMTP (Email, via Nodemailer — use a Google Workspace address or a
+# Gmail account with an App Password: https://myaccount.google.com/apppasswords)
+GMAIL_USER=noreply@nityasamagri.in
+GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+ 
+# Eshopbox (Shipping — replaces Shiprocket)
+ESHOPBOX_API_TOKEN=your_eshopbox_bearer_token
+ESHOPBOX_EXTERNAL_CHANNEL_ID=your_channel_id
+ESHOPBOX_WEBHOOK_SECRET=
  
 # AWS S3 (Media)
 AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXX
@@ -436,8 +445,8 @@ case "PAYMENT_FAILED":       // payment gateway issue
   "payload": {
     "orderId":   "ORD-2026-1999",
     "status":    "shipped",
-    "trackingNo": "SR20261999001",
-    "courierName": "Shiprocket",
+    "trackingNo": "ESB20261999001",
+    "courierName": "Eshopbox",
     "timestamp": 1748649600000
   }
 }
@@ -467,16 +476,15 @@ Product    → has many Variants, Images, Reviews, OrderItems
 PanditProfile → has many Services, Bookings, BlockedDates
 ```
  
-### Run migrations
+### Schema changes
+Mongoose has no separate migration step — schemas in `backend/src/database/models/`
+are applied as soon as the app connects, so a schema change just needs a
+restart. For data backfills/transforms, write a one-off script under
+`backend/scripts/` and run it with `ts-node`.
 ```bash
-# Development
-npx prisma migrate dev --name init
- 
-# Production
-npx prisma migrate deploy
- 
-# View DB in browser
-npx prisma studio
+# Browse the database directly
+mongosh "$MONGO_URI"
+# or connect with MongoDB Compass using the same connection string
 ```
  
 ---
@@ -513,15 +521,13 @@ cd nityasamagri
 cp backend/.env.example backend/.env
 nano backend/.env   # fill production values
  
-# 6. Deploy
-docker compose -f docker-compose.yml \
-               -f docker-compose.prod.yml \
+# 6. Deploy — migrations run automatically inside the api container's
+#    own entrypoint before the server starts, so no separate step is needed
+docker compose -f devops/docker/docker-compose.dev.yml \
+               -f devops/docker/docker-compose.prod.yml \
                up -d --build
  
-# 7. Run migrations
-docker compose exec api npx prisma migrate deploy
- 
-# 8. Check status
+# 7. Check status
 docker compose ps
 docker compose logs api --tail=50
 ```
@@ -530,7 +536,7 @@ docker compose logs api --tail=50
  
 ### GitHub Actions workflows (add to `.github/workflows/`)
  
-**deploy-api.yml** — Triggers on push to `main`, builds Docker image, pushes to Docker Hub, deploys to EC2:
+**backend.yml** — Triggers on push to `main`, builds Docker image, pushes to Docker Hub, deploys to EC2:
  
 ```yaml
 name: Deploy API
@@ -554,15 +560,17 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd nityasamagri
+            cd Nitya_Samagri
             git pull origin main
-            docker compose -f docker-compose.yml \
-                           -f docker-compose.prod.yml \
+            docker compose -f devops/docker/docker-compose.dev.yml \
+                           -f devops/docker/docker-compose.prod.yml \
                            up -d --build api
-            docker compose exec api npx prisma migrate deploy
+            # No separate migrate step — the api container's entrypoint
+            # (devops/docker/entrypoints/api-entrypoint.sh) runs migrations
+            # automatically before the server starts.
 ```
  
-**deploy-web.yml** — Auto-deploys customer web on Vercel on push to main.
+**frontend.yml** / **admin.yml** — Same pattern for the customer web app and admin panel, each on push to `main` when their own `apps/*` path changes (see the actual workflow files in `.github/workflows/` for the real, blue/green-aware version of this — the snippet above is simplified for illustration).
  
 ---
  
@@ -580,20 +588,41 @@ RAZORPAY_KEY_SECRET=XXXXX
 # 5. Select events: payment.captured, payment.failed, refund.processed
 ```
  
-### Shiprocket Setup
+### Eshopbox Setup
 ```bash
-# 1. Create account at shiprocket.in
-# 2. Settings → API → Generate API credentials
-# 3. Add to .env:
-SHIPROCKET_EMAIL=your@email.com
-SHIPROCKET_PASSWORD=your_password
+# 1. Create a workspace at eshopbox.com
+# 2. Settings → API → generate a Bearer API token
+# 3. Note the "sales channel" ID Eshopbox assigns your integration
+#    (sent as externalChannelID on every order create call)
+# 4. Add to .env:
+ESHOPBOX_API_TOKEN=your_eshopbox_bearer_token
+ESHOPBOX_EXTERNAL_CHANNEL_ID=your_channel_id
+ESHOPBOX_WEBHOOK_SECRET=  # generate a long random value; configure the
+                          # same value in your Eshopbox workspace's webhook
+                          # settings so POST /integrations/shipping/webhook
+                          # can verify incoming calls
 ```
  
-### Twilio OTP Setup
+### Firebase Phone OTP Setup
 ```bash
+# 1. Create a project at console.firebase.google.com
+# 2. Enable Phone sign-in under Authentication → Sign-in method
+# 3. Project settings → Service accounts → Generate new private key
+# 4. Add to .env:
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nXXXX\n-----END PRIVATE KEY-----\n"
+```
+Firebase handles sending the OTP SMS client-side; the backend only verifies
+the ID token it gets back via the Firebase Admin SDK's `verifyIdToken()`.
+
+### Twilio Setup (order-status SMS only)
+```bash
+# No longer used for OTP (see Firebase above) — only for shipped/delivered
+# order-update SMS, via src/integrations/twilio.ts.
 # 1. Create account at twilio.com
 # 2. Get Account SID and Auth Token from dashboard
-# 3. Buy an Indian phone number or use Twilio Verify
+# 3. Buy a phone number to send from
 # 4. Add to .env:
 TWILIO_SID=ACXXXXX
 TWILIO_TOKEN=XXXXX

@@ -19,12 +19,25 @@ The original app repo used PostgreSQL + Prisma. The actual backend runs on
 | `scripts/backup.sh` | `pg_dump` → `mongodump --archive --gzip` |
 | `.env.example` | `POSTGRES_PASSWORD` → `MONGO_ROOT_USER` / `MONGO_ROOT_PASSWORD` |
 
-**Not yet touched, and worth checking**: `backend/src/database/models/*.ts` in
+**Update, [current snapshot]**: the note below was accurate when first
+written, but no longer is — `backend/src/database/models/*.ts` now has 22
+populated Mongoose schemas (~800 lines total), so the app repo's data layer
+is in sync with the Mongo setup here. Leaving the original note below for
+history, since it's a useful reminder that this document can drift out of
+date just like the code it describes — re-check claims like this one
+against the actual repo state before relying on them.
+
+<details>
+<summary>Original note (now resolved)</summary>
+
+Not yet touched, and worth checking: `backend/src/database/models/*.ts` in
 the app repo itself were all found empty in the original zip, and there was
 no `prisma/schema.prisma` file either — so there's no confirmed Mongoose
 schema layer to point at yet. The `MONGO_URI` env var and connection logic
 here are ready, but the actual data models in the backend app repo still
 need to be written (or migrated from whatever the real source of truth is).
+
+</details>
 
 ## What moved from where
 
