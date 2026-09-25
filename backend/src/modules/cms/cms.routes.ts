@@ -1,5 +1,6 @@
 // src/modules/cms/cms.routes.ts — generic CRUD for all 6 CMS content types
 import { Router, Request, Response } from "express";
+import { Model } from "mongoose";
 import { Banner, Festival, Blog, Section, Announcement, SeoPage } from "../../database/models/CmsContent";
 import { AppError } from "../../utils/AppError";
 import { asyncHandler } from "../../middlewares/async.middleware";
@@ -11,7 +12,7 @@ const ADMIN = ["admin", "super_admin"];
 const MODELS = { banners: Banner, festivals: Festival, blogs: Blog, sections: Section, announcements: Announcement, "seo-pages": SeoPage } as const;
 type Key = keyof typeof MODELS;
 
-function modelFor(key: string) {
+function modelFor(key: string): Model<any> {
   const m = MODELS[key as Key];
   if (!m) throw new AppError(`Unknown CMS resource: ${key}`, 404);
   return m;

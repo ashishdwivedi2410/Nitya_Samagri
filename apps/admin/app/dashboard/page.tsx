@@ -11,8 +11,8 @@ import { useRouter } from "next/navigation";
 const fetcher = (url: string) => api.get<any>(url).then(r => r.data);
 const ICONS = ["🫙","🪔","📿","🪬","🏺","🪷","🕯️"];
 const iconFor = (seed: string) => ICONS[[...seed].reduce((a,c)=>a+c.charCodeAt(0),0) % ICONS.length];
-const STATUS_LABEL: Record<string,string> = { pending:"Pending", confirmed:"Confirmed", packed:"Packed", ready_for_pickup:"Ready for Pickup", shipped:"Shipped", out_for_delivery:"Out for Delivery", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned", refunded:"Refunded", NDR:"NDR" };
-const STATUS_COLOR: Record<string,string> = { pending:"#F5A623", confirmed:"#3B82F6", packed:"#A855F7", shipped:"#E8560A", delivered:"#22C55E", cancelled:"#EF4444" };
+const STATUS_LABEL: Record<string,string> = { pending:"Pending", confirmed:"Confirmed", processing:"Packed", ready_for_pickup:"Ready for Pickup", shipped:"Shipped", out_for_delivery:"Out for Delivery", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned", refunded:"Refunded", NDR:"NDR" };
+const STATUS_COLOR: Record<string,string> = { pending:"#F5A623", confirmed:"#3B82F6", processing:"#A855F7", shipped:"#E8560A", delivered:"#22C55E", cancelled:"#EF4444" };
 
 // ─── THEME: Obsidian + Saffron — dark professional with warm accent ───────────
 const C = {
@@ -99,7 +99,7 @@ function OverviewView() {
 
   const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const PALETTE = [C.saffron, C.marigold, C.gold, C.blue, C.purple, C.green];
-  const STATUS_ORDER = ["pending","confirmed","packed","shipped","delivered","cancelled"];
+  const STATUS_ORDER = ["pending","confirmed","processing","shipped","delivered","cancelled"];
 
   const REVENUE_CHART = (stats?.revenueTrend || []).map((r: any) => ({
     month: MONTH_NAMES[Number(r.month.split("-")[1]) - 1], rev: r.revenue, orders: r.orders,

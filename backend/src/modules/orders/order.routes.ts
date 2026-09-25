@@ -48,7 +48,7 @@ const CreateOrderSchema = z.object({
 
 const UpdateStatusSchema = z.object({
   status: z.enum([
-    "confirmed", "packed", "ready_for_pickup", "shipped", "out_for_delivery",
+    "confirmed", "processing", "ready_for_pickup", "shipped", "out_for_delivery",
     "delivered", "cancelled", "returned", "refunded",
   ]),
   trackingNo: z.string().optional(),
@@ -73,7 +73,7 @@ const AdminOrdersQuerySchema = z.object({
 });
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: "Pending", confirmed: "Confirmed", packed: "Packed",
+  pending: "Pending", confirmed: "Confirmed", processing: "Packed",
   ready_for_pickup: "Ready for Pickup", shipped: "Shipped",
   out_for_delivery: "Out for Delivery", delivered: "Delivered",
   cancelled: "Cancelled", returned: "Returned", refunded: "Refunded",
