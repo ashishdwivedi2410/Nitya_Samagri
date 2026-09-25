@@ -122,19 +122,17 @@ jobs:
               docker tag  ${{ env.REGISTRY }}/nityasamagri/$svc:$NEW_TAG ${{ env.REGISTRY }}/nityasamagri/$svc:$IDLE
             done
 
-            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+            docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
               up -d --no-deps api_$IDLE web_$IDLE admin_$IDLE
 
             sleep 20
 
-            # No migration step here: this is Mongoose/MongoDB, not Prisma —
-            # there's no schema.prisma and no migration runner wired up yet.
-            # Mongoose builds indexes lazily on first use; see
-            # src/database/indexes.ts::ensureIndexes() if you want an
-            # explicit post-deploy index sync instead.
+            # No separate migrate step here — devops/docker/entrypoints/api-entrypoint.sh
+            # already runs `npm run migrate --if-present` before the server starts,
+            # so api_$IDLE has migrated itself as part of coming up above.
 
             echo "🔎 Green-testing the idle ($IDLE) containers directly — no public traffic involved yet."
-            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml \
+            docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
               run --rm --no-deps smoketest "
                 set -e
                 curl -sf --max-time 10 http://api_${IDLE}:4000/health | grep -q '\"status\":\"ok\"'
@@ -163,10 +161,10 @@ jobs:
             IDLE=$(cat ~/Nitya_Samagri/.idle_color)
 
             for svc in api web admin; do
-              cp docker/nginx/active/${svc}-backend.${IDLE}.conf docker/nginx/active/${svc}-backend.conf
+              cp devops/nginx/active/${svc}-backend.${IDLE}.conf devops/nginx/active/${svc}-backend.conf
             done
 
-            docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml exec -T nginx nginx -s reload
+            docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml exec -T nginx nginx -s reload
 
             echo "$IDLE" > ~/Nitya_Samagri/.active_color
             echo "✅ Traffic cut over to $IDLE."
@@ -177,8 +175,8 @@ jobs:
       - name: Verify public traffic after cutover
         if: success()
         run: |
-          chmod +x scripts/smoke-test.sh
-          ./scripts/smoke-test.sh
+          chmod +x devops/scripts/smoke-test.sh
+          ./devops/scripts/smoke-test.sh
         env:
           SMOKE_TEST_RETRIES:     "6"
           SMOKE_TEST_RETRY_DELAY: "8"
@@ -202,7 +200,7 @@ jobs:
 
             if [ -n "$IDLE" ] && [ "$IDLE" != "$ACTIVE" ]; then
               echo "🧹 Stopping unhealthy $IDLE containers — $ACTIVE never stopped serving traffic."
-              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml stop api_$IDLE web_$IDLE admin_$IDLE || true
+              docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml stop api_$IDLE web_$IDLE admin_$IDLE || true
             else
               # We got here after a successful cutover, meaning the *public*
               # verification step failed — traffic IS on the bad color.
@@ -210,9 +208,9 @@ jobs:
               echo "⚠️  Failure happened AFTER cutover — rolling nginx back to the previous color."
               PREV=$([ "$ACTIVE" = "blue" ] && echo green || echo blue)
               for svc in api web admin; do
-                cp docker/nginx/active/${svc}-backend.${PREV}.conf docker/nginx/active/${svc}-backend.conf
+                cp devops/nginx/active/${svc}-backend.${PREV}.conf devops/nginx/active/${svc}-backend.conf
               done
-              docker compose -f devops/docker-compose.yml -f devops/docker-compose.prod.yml exec -T nginx nginx -s reload
+              docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml exec -T nginx nginx -s reload
               echo "$PREV" > ~/Nitya_Samagri/.active_color
               echo "🔙 Rolled back to $PREV."
             fi

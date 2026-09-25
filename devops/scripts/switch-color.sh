@@ -19,9 +19,9 @@
 # Env vars:
 #   APP_DIR      - path to the checked-out app repo (default: ~/Nitya_Samagri)
 #   NGINX_DIR    - path to this devops repo's nginx/ dir
-#                   (default: ~/nitya-samagri-devops/nginx)
+#                   (default: ~/Nitya_Samagri/devops/nginx)
 #   COMPOSE_DIR  - path to this devops repo's docker/ dir
-#                   (default: ~/nitya-samagri-devops/docker)
+#                   (default: ~/Nitya_Samagri/devops/docker)
 #   STATE_FILE   - where the current color is recorded
 #                   (default: $APP_DIR/.active_color)
 
@@ -38,8 +38,8 @@ case "$COLOR" in
 esac
 
 APP_DIR="${APP_DIR:-$HOME/Nitya_Samagri}"
-NGINX_DIR="${NGINX_DIR:-$HOME/nitya-samagri-devops/nginx}"
-COMPOSE_DIR="${COMPOSE_DIR:-$HOME/nitya-samagri-devops/docker}"
+NGINX_DIR="${NGINX_DIR:-$HOME/Nitya_Samagri/devops/nginx}"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOME/Nitya_Samagri/devops/docker}"
 STATE_FILE="${STATE_FILE:-$APP_DIR/.active_color}"
 
 echo "🔀 Switching [${SERVICES[*]}] to $COLOR..."

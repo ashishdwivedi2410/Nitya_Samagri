@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/admin/**"
-      - ".github/workflows/deploy-admin.yml"
+      - ".github/workflows/admin.yml"
 
 env:
   REGISTRY:     docker.io
@@ -81,8 +81,8 @@ jobs:
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG
             docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$NEW_TAG ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
 
-            docker compose -f devops/docker-compose.yml \
-                           -f devops/docker-compose.prod.yml \
+            docker compose -f devops/docker/docker-compose.dev.yml \
+                           -f devops/docker/docker-compose.prod.yml \
                            up -d --no-deps admin_$ACTIVE
 
             sleep 10
@@ -97,8 +97,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          chmod +x scripts/smoke-test.sh
-          ./scripts/smoke-test.sh
+          chmod +x devops/scripts/smoke-test.sh
+          ./devops/scripts/smoke-test.sh
         env:
           SKIP_API:                "1"
           SKIP_WEB:                "1"

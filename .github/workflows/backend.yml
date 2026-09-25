@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
-      - ".github/workflows/deploy-api.yml"
+      - ".github/workflows/backend.yml"
   pull_request:
     branches: [main]
     paths:
@@ -65,21 +65,25 @@ jobs:
           --health-retries 5
 
     env:
-      MONGO_URI:              mongodb://localhost:27017/nityasamagri_test
-      REDIS_HOST:             localhost
-      REDIS_PORT:             "6379"
-      REDIS_PASSWORD:         ""
-      JWT_SECRET:             test_jwt_secret_32_characters_long
-      JWT_REFRESH_SECRET:     test_refresh_secret_32_characters
-      JWT_EXPIRES_IN:         15m
-      JWT_REFRESH_EXPIRES_IN: 30d
-      NODE_ENV:               test
-      RAZORPAY_KEY_ID:        rzp_test_dummy
-      RAZORPAY_KEY_SECRET:    dummy_secret
-      TWILIO_SID:             ACdummy
-      TWILIO_TOKEN:           dummy
-      TWILIO_PHONE:           "+10000000000"
-      SENDGRID_API_KEY:       SG.dummy
+      MONGO_URI:               mongodb://localhost:27017/nityasamagri_test
+      REDIS_HOST:              localhost
+      REDIS_PORT:              "6379"
+      REDIS_PASSWORD:          ""
+      JWT_SECRET:              test_jwt_secret_32_characters_long
+      JWT_REFRESH_SECRET:      test_refresh_secret_32_characters
+      JWT_EXPIRES_IN:          15m
+      JWT_REFRESH_EXPIRES_IN:  30d
+      NODE_ENV:                test
+      RAZORPAY_KEY_ID:         rzp_test_dummy
+      RAZORPAY_KEY_SECRET:     dummy_secret
+      TWILIO_SID:              ACdummy
+      TWILIO_TOKEN:            dummy
+      TWILIO_PHONE:            "+10000000000"
+      GMAIL_USER:              noreply@example.com
+      GMAIL_APP_PASSWORD:      dummy_app_password
+      FIREBASE_PROJECT_ID:     test-project
+      FIREBASE_CLIENT_EMAIL:   test@test-project.iam.gserviceaccount.com
+      FIREBASE_PRIVATE_KEY:    "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n"
 
     steps:
       - uses: actions/checkout@v4
@@ -150,25 +154,24 @@ jobs:
             cd ~/Nitya_Samagri
             git pull origin main
 
-            # Pull new API image
-            docker compose -f devops/docker-compose.yml \
-                           -f devops/docker-compose.prod.yml \
-                           pull api
+            ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
+            echo "Currently live color: $ACTIVE — updating api_$ACTIVE in place."
 
-            # Restart API
-            docker compose -f devops/docker-compose.yml \
-                           -f devops/docker-compose.prod.yml \
-                           up -d --no-deps api
+            # Pull new API image
+            docker compose -f devops/docker/docker-compose.dev.yml \
+                           -f devops/docker/docker-compose.prod.yml \
+                           pull api_$ACTIVE
+
+            # Restart API — migrations run automatically inside the
+            # container's entrypoint (devops/docker/entrypoints/api-entrypoint.sh)
+            # before the server starts, so no separate migrate step is needed here.
+            docker compose -f devops/docker/docker-compose.dev.yml \
+                           -f devops/docker/docker-compose.prod.yml \
+                           up -d --no-deps api_$ACTIVE
 
             # Wait and health check
             sleep 15
             curl -sf https://api.adminns.in/health || exit 1
-
-            # No migration step here: this is Mongoose/MongoDB, not Prisma —
-            # there's no schema.prisma and no migration runner wired up yet.
-            # Mongoose builds indexes lazily on first use; see
-            # src/database/indexes.ts::ensureIndexes() if you want an
-            # explicit post-deploy index sync instead.
 
             # Cleanup
             docker image prune -f
@@ -176,8 +179,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          chmod +x scripts/smoke-test.sh
-          ./scripts/smoke-test.sh
+          chmod +x devops/scripts/smoke-test.sh
+          ./devops/scripts/smoke-test.sh
         env:
           SKIP_WEB:                "1"
           SKIP_ADMIN:              "1"

@@ -43,8 +43,8 @@ jobs:
           envs:     INPUT_TAG,INPUT_SERVICE
           script: |
             set -e
-            cd ~/nityasamagri
-            STATE_FILE=~/nityasamagri/.deploy_state
+            cd ~/Nitya_Samagri
+            STATE_FILE=~/Nitya_Samagri/.deploy_state
 
             TAG="$INPUT_TAG"
             if [ -z "$TAG" ]; then
@@ -62,15 +62,23 @@ jobs:
               SERVICES="$INPUT_SERVICE"
             fi
 
-            echo "🔙 Rolling back [$SERVICES] to tag: $TAG"
+            # Prod only runs blue/green pairs (api_blue/api_green, etc.) — there's
+            # no bare "api"/"web"/"admin" service to target, so roll back whichever
+            # color is currently live, in place (same pattern backend.yml/frontend.yml/
+            # admin.yml use for their single-service deploys).
+            ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
+            echo "🔙 Rolling back [$SERVICES] (color: $ACTIVE) to tag: $TAG"
 
             for svc in $SERVICES; do
               docker pull docker.io/nityasamagri/$svc:$TAG
-              docker tag  docker.io/nityasamagri/$svc:$TAG docker.io/nityasamagri/$svc:latest
+              docker tag  docker.io/nityasamagri/$svc:$TAG docker.io/nityasamagri/$svc:$ACTIVE
             done
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              up -d --no-deps $SERVICES
+            TARGETS=""
+            for svc in $SERVICES; do TARGETS="$TARGETS ${svc}_$ACTIVE"; done
+
+            docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+              up -d --no-deps $TARGETS
 
             sleep 20
 
@@ -86,10 +94,8 @@ jobs:
 
       - name: Verify rollback with smoke test
         run: |
-          chmod +x scripts/smoke-test.sh
-          ./scripts/smoke-test.sh
+          chmod +x devops/scripts/smoke-test.sh
+          ./devops/scripts/smoke-test.sh
         env:
           SMOKE_TEST_RETRIES:     "6"
           SMOKE_TEST_RETRY_DELAY: "8"
-
-          

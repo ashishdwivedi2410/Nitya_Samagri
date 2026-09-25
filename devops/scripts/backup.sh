@@ -14,7 +14,7 @@
 #   AWS_S3_BUCKET, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 #   MONGO_ROOT_USER, MONGO_ROOT_PASSWORD  - must match docker-compose's mongodb service
 #   COMPOSE_DIR      - path to this devops repo's docker/ dir
-#                       (default: ~/nitya-samagri-devops/docker)
+#                       (default: ~/Nitya_Samagri/devops/docker)
 #   RETENTION_DAYS   - how many most-recent backups to keep (default: 30)
 
 set -euo pipefail
@@ -24,7 +24,7 @@ set -euo pipefail
 : "${MONGO_ROOT_USER:?MONGO_ROOT_USER is required}"
 : "${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD is required}"
 
-COMPOSE_DIR="${COMPOSE_DIR:-$HOME/nitya-samagri-devops/docker}"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOME/Nitya_Samagri/devops/docker}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 
 DATE=$(date +%Y-%m-%d)

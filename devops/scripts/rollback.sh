@@ -14,14 +14,20 @@
 #             tag recorded in .deploy_state.previous
 #   service - one of: all | api | web | admin | chatbot  (default: all)
 #
-# Expects to be run from the deploy host, in the directory containing
-# docker-compose.yml + docker-compose.prod.yml (see docker/ in this repo).
+# Env vars:
+#   APP_DIR      - path to the checked-out app repo (default: ~/Nitya_Samagri)
+#   COMPOSE_DIR  - path to this devops repo's docker/ dir
+#                   (default: ~/Nitya_Samagri/devops/docker)
 
 set -euo pipefail
 
 TAG="${1:-}"
 SERVICE="${2:-all}"
-STATE_FILE=".deploy_state"
+APP_DIR="${APP_DIR:-$HOME/Nitya_Samagri}"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOME/Nitya_Samagri/devops/docker}"
+STATE_FILE="${APP_DIR}/.deploy_state"
+
+cd "$APP_DIR"
 
 if [ -z "$TAG" ]; then
   TAG=$(cat "${STATE_FILE}.previous" 2>/dev/null || echo "")
@@ -38,15 +44,27 @@ else
   SERVICES="$SERVICE"
 fi
 
-echo "🔙 Rolling back [$SERVICES] to tag: $TAG"
+# Prod only runs blue/green pairs for api/web/admin — there's no bare
+# service to target, so roll back whichever color is currently live, in
+# place (chatbot has no blue/green pair — see nginx/active/README.md).
+ACTIVE=$(cat "${APP_DIR}/.active_color" 2>/dev/null || echo blue)
+echo "🔙 Rolling back [$SERVICES] (color: $ACTIVE) to tag: $TAG"
 
+TARGETS=""
 for svc in $SERVICES; do
-  docker pull "docker.io/nityasamagri/${svc}:${TAG}"
-  docker tag  "docker.io/nityasamagri/${svc}:${TAG}" "docker.io/nityasamagri/${svc}:latest"
+  if [ "$svc" = "chatbot" ]; then
+    docker pull "docker.io/nityasamagri/${svc}:${TAG}"
+    docker tag  "docker.io/nityasamagri/${svc}:${TAG}" "docker.io/nityasamagri/${svc}:latest"
+    TARGETS="$TARGETS chatbot"
+  else
+    docker pull "docker.io/nityasamagri/${svc}:${TAG}"
+    docker tag  "docker.io/nityasamagri/${svc}:${TAG}" "docker.io/nityasamagri/${svc}:${ACTIVE}"
+    TARGETS="$TARGETS ${svc}_${ACTIVE}"
+  fi
 done
 
-docker compose -f docker/docker-compose.dev.yml -f docker/docker-compose.prod.yml \
-  up -d --no-deps $SERVICES
+docker compose -f "${COMPOSE_DIR}/docker-compose.dev.yml" -f "${COMPOSE_DIR}/docker-compose.prod.yml" \
+  up -d --no-deps $TARGETS
 
 sleep 20
 

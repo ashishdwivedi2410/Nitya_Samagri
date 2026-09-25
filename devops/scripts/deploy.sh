@@ -18,15 +18,21 @@
 # Env vars:
 #   APP_DIR       - path to the checked-out app repo (default: ~/Nitya_Samagri)
 #   COMPOSE_DIR    - path to this devops repo's docker/ dir
-#                     (default: ~/nitya-samagri-devops/docker)
-#   RUN_MIGRATIONS - "1" to run `prisma migrate deploy` after restart
-#                     (only meaningful for the api service; default "1" for api)
+#                     (default: ~/Nitya_Samagri/devops/docker)
+#
+# Note: chatbot has no blue/green pair (see nginx/active/README.md), so it
+# deploys as a bare service; api/web/admin do, so this script updates
+# whichever color is currently live, in place — same pattern the CI
+# workflows use for their single-service deploys. Migrations for the api
+# service run automatically inside the container's own entrypoint
+# (docker/entrypoints/api-entrypoint.sh) before the server starts, so
+# there's no separate migrate step here.
 
 set -euo pipefail
 
 SERVICE="${1:?Usage: deploy.sh <api|web|admin|chatbot> [health_url]}"
 APP_DIR="${APP_DIR:-$HOME/Nitya_Samagri}"
-COMPOSE_DIR="${COMPOSE_DIR:-$HOME/nitya-samagri-devops/docker}"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOME/Nitya_Samagri/devops/docker}"
 
 case "$SERVICE" in
   api)     DEFAULT_HEALTH_URL="https://api.adminns.in/health" ;;
@@ -36,7 +42,6 @@ case "$SERVICE" in
   *) echo "❌ Unknown service '$SERVICE' (expected: api|web|admin|chatbot)"; exit 1 ;;
 esac
 HEALTH_URL="${2:-$DEFAULT_HEALTH_URL}"
-RUN_MIGRATIONS="${RUN_MIGRATIONS:-$([ "$SERVICE" = "api" ] && echo 1 || echo 0)}"
 
 echo "🚀 Deploying $SERVICE..."
 
@@ -45,20 +50,23 @@ git pull origin main
 
 COMPOSE="docker compose -f ${COMPOSE_DIR}/docker-compose.dev.yml -f ${COMPOSE_DIR}/docker-compose.prod.yml"
 
+if [ "$SERVICE" = "chatbot" ]; then
+  TARGET="chatbot"
+else
+  ACTIVE=$(cat "${APP_DIR}/.active_color" 2>/dev/null || echo blue)
+  TARGET="${SERVICE}_${ACTIVE}"
+  docker tag "docker.io/nityasamagri/${SERVICE}:latest" "docker.io/nityasamagri/${SERVICE}:${ACTIVE}" 2>/dev/null || true
+fi
+
 # Pull new image
-$COMPOSE pull "$SERVICE"
+$COMPOSE pull "$TARGET"
 
 # Restart just this service
-$COMPOSE up -d --no-deps "$SERVICE"
+$COMPOSE up -d --no-deps "$TARGET"
 
 # Wait and health check
 sleep 15
 curl -sf "$HEALTH_URL" > /dev/null || { echo "❌ Health check failed for $SERVICE"; exit 1; }
-
-if [ "$RUN_MIGRATIONS" = "1" ]; then
-  echo "📦 Running database migrations..."
-  $COMPOSE exec -T api npx prisma migrate deploy
-fi
 
 # Cleanup dangling images from the old version
 docker image prune -f

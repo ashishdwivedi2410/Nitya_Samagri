@@ -15,8 +15,10 @@ version: "3.9"
 services:
   api:
     build:
-      context: ../../backend
-      dockerfile: Dockerfile
+      # backend/Dockerfile COPYs the root package-lock.json (npm workspaces),
+      # so context must be the repo root, not backend/.
+      context: ../../
+      dockerfile: backend/Dockerfile
       target: production
     env_file: ../../backend/.env.staging
     environment:
@@ -28,8 +30,8 @@ services:
 
   web:
     build:
-      context: ../../apps/web
-      dockerfile: Dockerfile
+      context: ../../
+      dockerfile: apps/web/Dockerfile
       target: production
     environment:
       NODE_ENV: staging
@@ -38,25 +40,29 @@ services:
 
   admin:
     build:
-      context: ../../apps/admin
-      dockerfile: Dockerfile
+      context: ../../
+      dockerfile: apps/admin/Dockerfile
       target: production
     environment:
       NODE_ENV: staging
       NEXT_PUBLIC_API_URL: https://staging-api.nityasamagri.in
     restart: unless-stopped
 
-  # NEW: chatbot didn't exist in the original app. Path assumes it lives as
-  # a sibling to backend/apps at repo root — adjust `context` to match
-  # wherever nitya-samagri-chatbot actually gets checked out on the host.
-  chatbot:
-    build:
-      context: ../../chatbot
-      dockerfile: Dockerfile
-    env_file: ../../chatbot/.env.staging
-    environment:
-      NODE_ENV: staging
-    restart: unless-stopped
+  # NEW: chatbot didn't exist in the original app, and as of this snapshot
+  # there's no chatbot/ directory, Dockerfile, or app code anywhere in this
+  # repo — this service will fail to build until that code exists somewhere.
+  # Left commented out rather than pointing at a path that can't work yet;
+  # uncomment and fix the context once nitya-samagri-chatbot has real code
+  # checked out (either as a repo-root sibling of backend/apps, or update
+  # the path to wherever it actually lives).
+  # chatbot:
+  #   build:
+  #     context: ../../chatbot
+  #     dockerfile: Dockerfile
+  #   env_file: ../../chatbot/.env.staging
+  #   environment:
+  #     NODE_ENV: staging
+  #   restart: unless-stopped
 
   mongodb:
     environment:
