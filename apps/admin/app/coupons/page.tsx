@@ -439,6 +439,7 @@ function AdminCoupons() {
 
   const toggle  = async (id) => {
     const c = (coupons || []).find(x => x.id === id);
+    if (!c) return;
     await api.patch(`/api/v1/coupons/${id}`, { isActive: !c.isActive });
     mutate();
   };

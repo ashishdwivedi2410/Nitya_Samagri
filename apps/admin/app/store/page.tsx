@@ -222,6 +222,7 @@ function BannersView() {
 
   const toggleStatus = async (id) => {
     const b = banners.find(x => x.id === id);
+    if (!b) return;
     await cmsUpdate("banners", id, { status: b.status === "active" ? "draft" : "active" });
     mutate();
   };
@@ -374,7 +375,7 @@ function FestivalsView() {
               <StatusPill status={f.status}/>
             </div>
             <div style={{ fontFamily:"'Georgia',serif", fontSize:17, color:S.text, marginBottom:4 }}>{f.name}</div>
-            <div style={{ fontSize:12, color:S.textLight, marginBottom:14 }}>📅 {f.startDate} → {f.endDate}</div>
+            <div style={{ fontSize:12, color:S.textLight, marginBottom:14 }}>📅 {f.start} → {f.end}</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
               {[["📦 Products",f.products],["🎟️ Coupons",2]].map(([label,val])=>(
                 <div key={label} style={{ background:S.bgHover, borderRadius:8, padding:"8px 10px", textAlign:"center" }}>
@@ -400,7 +401,7 @@ function FestivalsView() {
               <span style={{ fontSize:32 }}>{selected.icon}</span>
               <div>
                 <div style={{ fontFamily:"'Georgia',serif", fontSize:20, color:S.text }}>{selected.name}</div>
-                <div style={{ fontSize:12, color:S.textLight }}>{selected.startDate} → {selected.endDate}</div>
+                <div style={{ fontSize:12, color:S.textLight }}>{selected.start} → {selected.end}</div>
               </div>
             </div>
             <div style={{ display:"flex", gap:8 }}>
@@ -458,7 +459,7 @@ function FestivalsView() {
 // ─── BLOG ─────────────────────────────────────────────────────────────────────
 function BlogView() {
   const { data, mutate } = useSWR("/api/v1/cms/blogs", cmsFetcher, { fallbackData: [] });
-  const blogs = (data || []).map((b: any) => ({ id: b._id, title: b.title, category: b.category || "Products", excerpt: b.excerpt || "", author: b.author || "Admin", status: b.status === "published" ? "Published" : "Draft", views: b.views || 0, date: fmtDate(b.publishedAt || b.createdAt) }));
+  const blogs = (data || []).map((b: any) => ({ id: b._id, title: b.title, category: b.category || "Products", excerpt: b.excerpt || "", author: b.author || "Admin", status: b.status === "published" ? "Published" : "Draft", views: b.views || 0, date: fmtDate(b.publishedAt || b.createdAt), tags: b.tags || [] }));
   const [filter, setFilter] = useState("All");
   const [writing, setWriting] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -657,13 +658,14 @@ function SEOView() {
 // ─── ANNOUNCEMENTS ────────────────────────────────────────────────────────────
 function AnnouncementsView() {
   const { data, mutate } = useSWR("/api/v1/cms/announcements", cmsFetcher, { fallbackData: [] });
-  const announcements = (data || []).map((a: any) => ({ id: a._id, text: a.text, active: a.active, bg: a.bg || S.saffron, color: a.color || "#fff" }));
+  const announcements = (data || []).map((a: any) => ({ id: a._id, text: a.text, active: a.active, bg: a.bg || S.saffron, color: a.color || "#fff", start: fmtDate(a.startDate), end: fmtDate(a.endDate) }));
   const [showNew, setShowNew] = useState(false);
   const [newText, setNewText] = useState("");
   const [newBg, setNewBg] = useState(S.saffron);
 
   const toggle = async (id) => {
     const a = announcements.find(x => x.id === id);
+    if (!a) return;
     await cmsUpdate("announcements", id, { active: !a.active });
     mutate();
   };
