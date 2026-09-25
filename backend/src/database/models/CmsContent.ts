@@ -1,5 +1,5 @@
 // src/database/models/CmsContent.ts — Banner, Festival, Blog, Section, Announcement, SeoPage
-import { Schema, model, Document } from "mongoose";
+import { Schema, model, type Document } from "mongoose";
 
 export interface IBanner extends Document {
   title: string; desktopEmoji?: string; mobileEmoji?: string; imageUrl?: string; cta?: string; url?: string;

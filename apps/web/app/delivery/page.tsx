@@ -29,16 +29,33 @@ const STAGES = [
 ];
 const EXCEPTION_STATUSES = ["NDR", "cancelled", "returned", "refunded"];
 
-function currentIndex(status) {
+function currentIndex(status: string) {
   return STAGES.findIndex(s => s.key === status);
 }
+
+// Loosely-typed shapes just strict enough to stop TS from collapsing these
+// to `never` after the early-return guards below. Swap for real Order /
+// Address / TimelineEvent / Tracking types if/when they exist in this app.
+type OrderItem = { productName: string; qty: number; price: number };
+type TimelineEvent = { status: string; createdAt: string };
+type Address = { fullName: string; line1: string; line2?: string; city: string; state: string; pincode: string; phone: string };
+type Order = {
+  orderId: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  addressId: Address;
+  items: OrderItem[];
+  timeline?: TimelineEvent[];
+};
+type Tracking = { courierName?: string; awb?: string };
 
 export default function DeliveryTrackingPage() {
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get("orderId");
 
-  const [order, setOrder] = useState(null);
-  const [courier, setCourier] = useState(null); // best-effort — may stay null
+  const [order, setOrder] = useState<Order | null>(null);
+  const [courier, setCourier] = useState<Tracking | null>(null); // best-effort — may stay null
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -54,14 +71,14 @@ export default function DeliveryTrackingPage() {
         let orderId = orderIdParam;
         if (!orderId) {
           // No order specified — fall back to the most recent order.
-          const { ok, body } = await apiFetch("/orders?limit=1");
+          const { ok, body } = await apiFetch<{ data: { orders: Order[] } }>("/orders?limit=1");
           if (!ok) throw new Error(body.message || "Couldn't load your orders.");
           const latest = body.data.orders?.[0];
           if (!latest) { if (!cancelled) { setError("You don't have any orders yet."); setLoading(false); } return; }
           orderId = latest.orderId;
         }
 
-        const { ok, body } = await apiFetch(`/orders/${orderId}`);
+        const { ok, body } = await apiFetch<{ data: { order: Order } }>(`/orders/${orderId}`);
         if (cancelled) return;
         if (!ok) throw new Error(body.message || "Order not found.");
         setOrder(body.data.order);
@@ -69,7 +86,7 @@ export default function DeliveryTrackingPage() {
         // Live courier info is best-effort — Eshopbox may not be configured
         // in this environment, or the order may not be handed off yet, so a
         // failure here just means the courier card stays hidden.
-        apiFetch(`/integrations/shipping/track/${orderId}`)
+        apiFetch<{ data: { tracking: Tracking } }>(`/integrations/shipping/track/${orderId}`)
           .then(({ ok: trackOk, body: trackBody }) => {
             if (!cancelled && trackOk && trackBody.data?.tracking) setCourier(trackBody.data.tracking);
           })
@@ -150,7 +167,7 @@ export default function DeliveryTrackingPage() {
                 {STAGES.map((s, i) => {
                   const done = i <= idx;
                   const isLast = i === STAGES.length - 1;
-                  const event = order.timeline?.find(t => t.status === s.key);
+                  const event = order.timeline?.find((t: TimelineEvent) => t.status === s.key);
                   return (
                     <div key={s.key} style={{ display: "flex", gap: 16 }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -206,7 +223,7 @@ export default function DeliveryTrackingPage() {
 
             <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "20px 22px" }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 14 }}>📦 Items ({order.items?.length || 0})</div>
-              {(order.items || []).map((i, idx2) => (
+              {(order.items || []).map((i: OrderItem, idx2: number) => (
                 <div key={idx2} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, fontSize: 13 }}>
                   <div>
                     <div style={{ color: C.text, fontWeight: 500 }}>{i.productName}</div>

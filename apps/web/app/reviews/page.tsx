@@ -31,6 +31,11 @@ function Stars({ value, size = 14, onChange }: { value: number; size?: number; o
 type PendingItem = { productId: string; name: string; orderId?: string; deliveredOn?: string };
 type SubmittedReview = { id: string; name: string; rating: number; text: string; date: string };
 
+// Raw shapes as they come back from the API, before we map them into
+// PendingItem / SubmittedReview above.
+type RawPendingItem = { productId: string; name: string; orderId?: string; deliveredOn?: string };
+type RawReview = { _id: string; productId?: { name?: string }; rating: number; comment?: string; createdAt?: string };
+
 function WriteReviewForm({ item, onSubmit, onCancel, submitting }: {
   item: PendingItem; onSubmit: (vals: { rating: number; text: string }) => void; onCancel: () => void; submitting: boolean;
 }) {
@@ -67,15 +72,18 @@ export default function ReviewsPage() {
     if (!isLoggedIn()) { setError("Please log in to see your reviews."); setLoading(false); return; }
     setLoading(true);
     setError("");
-    Promise.all([apiFetch("/reviews/pending"), apiFetch("/reviews/mine")])
+    Promise.all([
+      apiFetch<{ data: { pending: RawPendingItem[] } }>("/reviews/pending"),
+      apiFetch<{ data: { reviews: RawReview[] } }>("/reviews/mine"),
+    ])
       .then(([pendingRes, mineRes]) => {
         if (!pendingRes.ok) throw new Error(pendingRes.body.message || "Couldn't load pending reviews.");
         if (!mineRes.ok) throw new Error(mineRes.body.message || "Couldn't load your reviews.");
-        setPending(pendingRes.body.data.pending.map((p: any) => ({
+        setPending(pendingRes.body.data.pending.map((p: RawPendingItem) => ({
           productId: p.productId, name: p.name, orderId: p.orderId,
           deliveredOn: p.deliveredOn ? new Date(p.deliveredOn).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "",
         })));
-        setSubmitted(mineRes.body.data.reviews.map((r: any) => ({
+        setSubmitted(mineRes.body.data.reviews.map((r: RawReview) => ({
           id: r._id, name: r.productId?.name || "Product", rating: r.rating, text: r.comment || "",
           date: r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "",
         })));
