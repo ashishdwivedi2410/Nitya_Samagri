@@ -89,10 +89,66 @@ jobs:
                            -f devops/docker/docker-compose.prod.yml \
                            up -d --no-deps admin_$ACTIVE
 
-            sleep 10
+            # Health check — retry instead of a single shot right after `up -d`,
+            # which raced the container's own startup. On final failure, isolate
+            # whether it's the app, nginx→container routing, or DNS/SSL, instead
+            # of failing with no evidence (same pattern as frontend.yml).
+            HEALTHY=0
+            for attempt in 1 2 3 4 5 6; do
+              sleep 8
+              if curl -sf --max-time 10 https://adminns.in > /dev/null; then
+                echo "✅ Health check passed (attempt $attempt/6)."
+                HEALTHY=1
+                break
+              fi
+              echo "⏳ Health check attempt $attempt/6 failed, retrying..."
+            done
 
-            # Health checks
-            curl -sf https://adminns.in || exit 1
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "❌ Health check failed after 6 attempts (~48s) — deploy did not come up healthy."
+              echo ""
+              echo "── Diagnostics: container status ──"
+              docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                ps admin_$ACTIVE
+
+              echo ""
+              echo "── Diagnostics: internal check (bypasses nginx/SSL/DNS) ──"
+              if docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                   exec -T admin_$ACTIVE wget -qO- http://localhost:3000/ > /dev/null 2>&1; then
+                echo "   ✅ App responds on :3000 inside its own container — the app is fine, this is an nginx-side routing problem."
+                echo ""
+                echo "── Diagnostics: nginx container status ──"
+                docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                  ps nginx
+
+                echo ""
+                echo "── Diagnostics: can nginx itself reach admin_$ACTIVE over the docker network? ──"
+                if docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                     exec -T nginx wget -qO- http://admin_$ACTIVE:3000/ > /dev/null 2>&1; then
+                  echo "   ✅ nginx CAN reach admin_$ACTIVE directly — routing works at the network level, so this is proxy config/SSL, not DNS."
+                else
+                  echo "   ❌ nginx CANNOT reach admin_$ACTIVE at all — DNS/network problem between the nginx and admin_$ACTIVE containers, not a config issue."
+                fi
+
+                echo ""
+                echo "── Diagnostics: active backend pointer nginx is actually using ──"
+                docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                  exec -T nginx cat /etc/nginx/active/admin-backend.conf
+
+                echo ""
+                echo "── Diagnostics: last 50 log lines from nginx ──"
+                docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                  logs --tail=50 nginx
+              else
+                echo "   ❌ App does NOT respond on :3000 inside its own container — the app itself is failing to boot."
+                echo ""
+                echo "── Diagnostics: last 100 log lines from admin_$ACTIVE ──"
+                docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                  logs --tail=100 admin_$ACTIVE
+              fi
+
+              exit 1
+            fi
 
             docker image prune -f
             echo "✅ Admin panel deployed (color: $ACTIVE)!"
