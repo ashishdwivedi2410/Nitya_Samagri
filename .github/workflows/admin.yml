@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY:     docker.io
-  IMAGE_NAME:   nityasamagri/admin
+  IMAGE_NAME:   nsadmin1/admin
   NODE_VERSION: "20"
 
 jobs:
