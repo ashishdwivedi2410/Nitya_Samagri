@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, isLoggedIn } from "../../lib/auth";
@@ -50,7 +50,7 @@ type Order = {
 };
 type Tracking = { courierName?: string; awb?: string };
 
-export default function DeliveryTrackingPage() {
+function DeliveryTrackingContent() {
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get("orderId");
 
@@ -247,6 +247,26 @@ export default function DeliveryTrackingPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// useSearchParams() (used above) opts this route into client-side rendering
+// for the search-param-dependent parts, so Next.js needs a Suspense boundary
+// here to prerender a fallback shell — without it, `next build` fails with
+// "useSearchParams() should be wrapped in a suspense boundary".
+export default function DeliveryTrackingPage() {
+  return (
+    <Suspense fallback={<DeliveryLoadingFallback />}>
+      <DeliveryTrackingContent />
+    </Suspense>
+  );
+}
+
+function DeliveryLoadingFallback() {
+  return (
+    <div style={{ minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI','Helvetica Neue',sans-serif", color: C.textLight, fontSize: 14 }}>
+      Loading tracking info…
     </div>
   );
 }
