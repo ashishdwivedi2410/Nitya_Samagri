@@ -68,34 +68,34 @@ services:
   # ── API — blue/green pair ────────────────────────────────────────────────────
   api_blue:
     <<: *api-common
-    image: docker.io/nityasamagri/api:blue
+    image: docker.io/nsadmin1/api:latest
     container_name: nityasamagri_api_blue
 
   api_green:
     <<: *api-common
-    image: docker.io/nityasamagri/api:green
+    image: docker.io/nsadmin1/api:latest
     container_name: nityasamagri_api_green
 
   # ── Web (customer storefront) — blue/green pair ──────────────────────────────
   web_blue:
     <<: *web-common
-    image: docker.io/nityasamagri/web:blue
+    image: docker.io/nsadmin1/web:latest
     container_name: nityasamagri_web_blue
 
   web_green:
     <<: *web-common
-    image: docker.io/nityasamagri/web:green
+    image: docker.io/nsadmin1/web:latest
     container_name: nityasamagri_web_green
 
   # ── Admin panel — blue/green pair ─────────────────────────────────────────────
   admin_blue:
     <<: *web-common
-    image: docker.io/nityasamagri/admin:blue
+    image: docker.io/nsadmin1/admin:latest
     container_name: nityasamagri_admin_blue
 
   admin_green:
     <<: *web-common
-    image: docker.io/nityasamagri/admin:green
+    image: docker.io/nsadmin1/admin:latest
     container_name: nityasamagri_admin_green
     
   # ── Smoke-test runner ─────────────────────────────────────────────────────────
