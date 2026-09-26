@@ -148,14 +148,34 @@ jobs:
             if ! docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
                    ps nginx --status running | grep -q nginx; then
               echo "⚠️  nginx is not running — attempting to start it."
+              # `|| true` is required here: under `set -e`, a non-zero exit from
+              # this command (e.g. "address already in use") would kill the
+              # script on the spot and skip every line below, including the
+              # diagnostics that explain *why* — which is exactly what happened
+              # the last time this fired. Let the check below decide, with
+              # evidence, whether this was fatal.
               docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
-                up -d --no-deps nginx
+                up -d --no-deps nginx || true
               sleep 5
               if ! docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
                      ps nginx --status running | grep -q nginx; then
                 echo "❌ nginx still isn't running after attempting to start it."
+                echo ""
+                echo "── Diagnostics: what's currently bound to host port 80/443 ──"
+                ( ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null ) | grep -E ':80 |:443 ' \
+                  || echo "   (couldn't inspect host sockets — try 'sudo ss -tlnp | grep :80' manually)"
+                echo ""
+                echo "── Diagnostics: any container (from any project) publishing 80/443 ──"
+                docker ps -a --filter "publish=80" --filter "publish=443"
+                echo ""
+                echo "── Diagnostics: nginx service logs ──"
+                docker compose -f devops/docker/docker-compose.dev.yml -f devops/docker/docker-compose.prod.yml \
+                  logs --tail=50 nginx
+                echo ""
                 echo "   This is outside what this deploy script can fix automatically —"
-                echo "   check certs/config on the server directly: docker compose logs nginx"
+                echo "   the diagnostics above should show what's holding the port; free it"
+                echo "   (e.g. 'docker rm -f <container>' or kill the stray docker-proxy/host"
+                echo "   process), then re-run this workflow."
                 exit 1
               fi
               echo "✅ nginx is now running."
