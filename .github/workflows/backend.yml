@@ -217,7 +217,12 @@ jobs:
                 HEALTHY=1
                 break
               fi
-              echo "⏳ Waiting for API... (attempt $i/10)"
+              if [ "$i" -eq 10 ]; then
+                echo "⏳ Waiting for API... (attempt $i/10) — last attempt, capturing verbose output:"
+                curl -v https://api.adminns.in/health || true
+              else
+                echo "⏳ Waiting for API... (attempt $i/10)"
+              fi
               sleep 5
             done
             if [ "$HEALTHY" -ne 1 ]; then
