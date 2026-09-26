@@ -148,15 +148,40 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          FIREBASE_PROJECT_ID:   ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY:  ${{ secrets.FIREBASE_PRIVATE_KEY }}
         with:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SERVER_SSH_KEY }}
           timeout:  120s
+          envs:     FIREBASE_PROJECT_ID,FIREBASE_CLIENT_EMAIL,FIREBASE_PRIVATE_KEY
           script: |
             set -e
             cd ~/Nitya_Samagri
             git pull origin main
+
+            # Fail fast with a clear message instead of a silent crash-loop
+            # if the GitHub secrets aren't set.
+            if [ -z "$FIREBASE_PROJECT_ID" ] || [ -z "$FIREBASE_CLIENT_EMAIL" ] || [ -z "$FIREBASE_PRIVATE_KEY" ]; then
+              echo "❌ One or more FIREBASE_* secrets are empty — check repo Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+
+            # Sync Firebase credentials from GitHub Secrets into backend/.env
+            # so the server never relies on a hand-edited value again.
+            ENV_FILE=backend/.env
+            grep -v -e '^FIREBASE_PROJECT_ID=' -e '^FIREBASE_CLIENT_EMAIL=' -e '^FIREBASE_PRIVATE_KEY=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+            {
+              cat "$ENV_FILE.tmp"
+              echo "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
+              echo "FIREBASE_CLIENT_EMAIL=$FIREBASE_CLIENT_EMAIL"
+              echo "FIREBASE_PRIVATE_KEY=\"$FIREBASE_PRIVATE_KEY\""
+            } > "$ENV_FILE"
+            rm -f "$ENV_FILE.tmp"
+            echo "🔐 Firebase credentials synced into backend/.env"
 
             ACTIVE=$(cat .active_color 2>/dev/null || echo blue)
             echo "Currently live color: $ACTIVE — updating api_$ACTIVE in place."
