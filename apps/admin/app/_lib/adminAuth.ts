@@ -57,7 +57,7 @@ export async function adminLogin(email: string, password: string): Promise<Admin
     throw new Error("Staff login requires an @adminns.in email address.");
   }
 
-  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
