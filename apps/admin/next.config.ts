@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://api.nityasamagri.com wss://api.nityasamagri.com",
+              "connect-src 'self' https://api.adminns.in wss://api.adminns.in",
               "frame-ancestors 'none'",
             ].join("; "),
           },
