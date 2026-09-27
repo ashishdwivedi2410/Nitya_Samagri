@@ -14,7 +14,7 @@ import { logger } from "../utils/logger";
 async function seed() {
   await connectDatabase();
 
-  const adminPhone = "9999999999";
+  const adminPhone = "+919936336675";
   const existingAdmin = await User.findOne({ phone: adminPhone });
   if (!existingAdmin) {
     await User.create({
