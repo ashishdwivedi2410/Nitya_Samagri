@@ -20,7 +20,7 @@ async function seed() {
     await User.create({
       name: "Admin",
       phone: adminPhone,
-      email: "admin@nityasamagri.in",
+      email: "admin@adminns.in",
       password: await bcrypt.hash("changeme123", 12),
       role: "admin",
       isVerified: true,
