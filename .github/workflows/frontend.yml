@@ -52,9 +52,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
@@ -133,6 +130,12 @@ jobs:
             done
 
             docker tag  "$PULL_IMAGE" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$ACTIVE
+            # docker-compose.prod.yml's web_blue/web_green both reference
+            # the :latest tag (not :blue/:green) — without also retagging
+            # here, `up -d` below sees no change to :latest and silently
+            # keeps the old container running, even though a new image was
+            # just pulled.
+            docker tag  "$PULL_IMAGE" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
             docker compose -f devops/docker/docker-compose.dev.yml \
                            -f devops/docker/docker-compose.prod.yml \
