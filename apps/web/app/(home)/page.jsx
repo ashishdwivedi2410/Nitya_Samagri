@@ -149,7 +149,7 @@ function Navbar({ cartCount }) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {[["Shop", "/shop"], ["Categories", "/shop"], ["Festivals", "/festival"]].map(([label, href]) => (
+          {[["Shop", "/shop"], ["Festivals", "/festival"]].map(([label, href]) => (
             <Link key={label} href={href} style={{ fontSize: 13, fontWeight: 500, color: COLORS.textMid, cursor: "pointer", transition: "color 0.2s", textDecoration: "none" }}
               onMouseEnter={e => e.target.style.color = COLORS.saffron}
               onMouseLeave={e => e.target.style.color = COLORS.textMid}

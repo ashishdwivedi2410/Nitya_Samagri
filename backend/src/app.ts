@@ -23,6 +23,7 @@ import couponRoutes        from "./modules/coupons/coupon.routes";
 import cmsRoutes           from "./modules/cms/cms.routes";
 import systemHealthRoutes  from "./modules/health/health.routes";
 import categoryRoutes      from "./modules/categories/category.routes";
+import brandRoutes         from "./modules/brands/brand.routes";
 
 // This file builds and exports the Express app only — it never binds a port,
 // creates an HTTP server, or opens the WebSocket server. That work belongs to
@@ -71,6 +72,7 @@ app.use(`${API}/coupons`,      couponRoutes);
 app.use(`${API}/cms`,          cmsRoutes);
 app.use(`${API}/system`,       systemHealthRoutes);
 app.use(`${API}/categories`,   categoryRoutes);
+app.use(`${API}/brands`,       brandRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);

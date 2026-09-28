@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import { Product } from "../../database/models/Product";
 import { ProductVariant } from "../../database/models/ProductVariant";
 import { Review } from "../../database/models/Review";
+import { Brand } from "../../database/models/Brand";
 import { InventoryLog } from "../../database/models/InventoryLog";
 import { redis, cacheDelPattern } from "../../config/redis";
 import { AppError } from "../../utils/AppError";
@@ -76,6 +77,10 @@ const ProductQuerySchema = z.object({
   // Comma-separated ObjectIds — used by the festival campaign page to fetch
   // exactly its linked products in one call instead of one request per id.
   ids: z.string().optional(),
+  // Comma-separated Brand ObjectIds / variant labels (e.g. "500g,1kg").
+  brandId: z.string().optional(),
+  size: z.string().optional(),
+  onSale: z.coerce.boolean().optional(),
   minPrice: z.coerce.number().optional(),
   maxPrice: z.coerce.number().optional(),
   inStock: z.coerce.boolean().optional(),
@@ -107,10 +112,22 @@ router.get(
       filter.$text = { $search: q.q };
     }
     if (q.categoryId) filter.categoryId = q.categoryId;
+    // _id constraints from `ids` and `size` are intersected, not overwritten.
+    let idConstraint: string[] | null = null;
     if (q.ids) {
-      const idList = q.ids.split(",").map((s) => s.trim()).filter(Boolean);
-      filter._id = { $in: idList };
+      idConstraint = q.ids.split(",").map((s) => s.trim()).filter((s) => /^[0-9a-fA-F]{24}$/.test(s));
     }
+    if (q.size) {
+      const labels = q.size.split(",").map((s) => s.trim()).filter(Boolean);
+      const sizeIds = (await ProductVariant.distinct("productId", { label: { $in: labels }, isActive: true })).map(String);
+      idConstraint = idConstraint ? idConstraint.filter((id) => sizeIds.includes(id)) : sizeIds;
+    }
+    if (idConstraint) filter._id = { $in: idConstraint };
+    if (q.brandId) {
+      const brandIds = q.brandId.split(",").map((s) => s.trim()).filter((s) => /^[0-9a-fA-F]{24}$/.test(s));
+      filter.brandId = { $in: brandIds };
+    }
+    if (q.onSale) filter.$expr = { $gt: ["$mrp", "$price"] };
     if (q.inStock) filter.stock = { $gt: 0 };
     if (q.isFeatured) filter.isFeatured = true;
     if (q.minPrice || q.maxPrice) {
@@ -123,7 +140,7 @@ router.get(
     const sort: Record<string, 1 | -1> = { [q.sortBy]: q.sortOrder === "asc" ? 1 : -1 };
 
     const [products, total] = await Promise.all([
-      Product.find(filter).populate("categoryId", "name").sort(sort).skip(skip).limit(take).lean(),
+      Product.find(filter).populate("categoryId", "name").populate("brandId", "name").sort(sort).skip(skip).limit(take).lean(),
       Product.countDocuments(filter),
     ]);
 
@@ -149,6 +166,51 @@ router.get(
 
     await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
     res.json(result);
+  })
+);
+
+/**
+ * GET /api/v1/products/filters
+ * Facets for the shop sidebar: brands, sizes (variant labels) with counts,
+ * and the price range. Must be registered before "/:slug" or "filters"
+ * would be treated as a product slug.
+ */
+router.get(
+  "/filters",
+  asyncHandler(async (_req: Request, res: Response) => {
+    const activeIds = await Product.distinct("_id", { status: "active" });
+
+    const [brandCounts, sizeCounts, priceAgg] = await Promise.all([
+      Product.aggregate([
+        { $match: { status: "active", brandId: { $ne: null } } },
+        { $group: { _id: "$brandId", count: { $sum: 1 } } },
+      ]),
+      ProductVariant.aggregate([
+        { $match: { productId: { $in: activeIds }, isActive: true } },
+        { $group: { _id: "$label", products: { $addToSet: "$productId" } } },
+        { $project: { _id: 1, count: { $size: "$products" } } },
+        { $sort: { count: -1, _id: 1 } },
+      ]),
+      Product.aggregate([
+        { $match: { status: "active" } },
+        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } },
+      ]),
+    ]);
+
+    const brandDocs = await Brand.find({ _id: { $in: brandCounts.map((b) => b._id) }, isActive: true }).lean();
+    const countByBrand = new Map(brandCounts.map((b) => [String(b._id), b.count]));
+    const brands = brandDocs
+      .map((b) => ({ _id: b._id, name: b.name, count: countByBrand.get(String(b._id)) || 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    res.json({
+      success: true,
+      data: {
+        brands,
+        sizes: sizeCounts.map((s) => ({ label: s._id, count: s.count })),
+        price: { min: Math.floor(priceAgg[0]?.min ?? 0), max: Math.ceil(priceAgg[0]?.max ?? 0) },
+      },
+    });
   })
 );
 
