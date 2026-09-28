@@ -73,6 +73,9 @@ const ProductQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   q: z.string().optional(),
   categoryId: objectId().optional(),
+  // Comma-separated ObjectIds — used by the festival campaign page to fetch
+  // exactly its linked products in one call instead of one request per id.
+  ids: z.string().optional(),
   minPrice: z.coerce.number().optional(),
   maxPrice: z.coerce.number().optional(),
   inStock: z.coerce.boolean().optional(),
@@ -104,6 +107,10 @@ router.get(
       filter.$text = { $search: q.q };
     }
     if (q.categoryId) filter.categoryId = q.categoryId;
+    if (q.ids) {
+      const idList = q.ids.split(",").map((s) => s.trim()).filter(Boolean);
+      filter._id = { $in: idList };
+    }
     if (q.inStock) filter.stock = { $gt: 0 };
     if (q.isFeatured) filter.isFeatured = true;
     if (q.minPrice || q.maxPrice) {

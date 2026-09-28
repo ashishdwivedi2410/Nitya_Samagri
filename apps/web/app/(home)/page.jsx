@@ -41,23 +41,18 @@ function normalizeListedProduct(p) {
   };
 }
  
-const categories = [
-  { name: "Puja Samagri", icon: "🪔", count: 320 },
-  { name: "Ghee & Oils", icon: "🫙", count: 48 },
-  { name: "Phool & Pattiya", icon: "🌸", count: 64 },
-  { name: "Hawan", icon: "🔥", count: 95 },
-  { name: "Prashad", icon: "🍬", count: 52 },
-  { name: "Idols & Books", icon: "📿", count: 187 },
-  { name: "Sugandhit", icon: "🕯️", count: 76 },
-  { name: "Utensils", icon: "🏺", count: 43 },
-];
- 
-const festivals = [
-  { name: "Navratri", date: "Coming Soon", color: "#D4270C", bg: "#FFF0EE" },
-  { name: "Diwali", date: "Oct 2026", color: "#C8860A", bg: "#FFF8EE" },
-  { name: "Janmashtami", date: "Aug 2026", color: "#1A5C8B", bg: "#EEF4FF" },
-  { name: "Shivratri", date: "Feb 2027", color: "#4A1A6B", bg: "#F4EEFF" },
-];
+// Fallback icon when a category has no imageUrl set yet.
+const DEFAULT_CATEGORY_ICON = "🪔";
+const FESTIVAL_BG_FALLBACK = "#FFF3EC";
+
+function formatFestivalDate(startDate) {
+  if (!startDate) return "Coming Soon";
+  try {
+    return new Date(startDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+  } catch {
+    return "Coming Soon";
+  }
+}
  
 function StarRating({ rating }) {
   return (
@@ -150,11 +145,11 @@ function Navbar({ cartCount }) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {["Shop", "Categories", "Festivals"].map(item => (
-            <span key={item} style={{ fontSize: 13, fontWeight: 500, color: COLORS.textMid, cursor: "pointer", transition: "color 0.2s" }}
+          {[["Shop", "/shop"], ["Categories", "/shop"], ["Festivals", "/festival"]].map(([label, href]) => (
+            <Link key={label} href={href} style={{ fontSize: 13, fontWeight: 500, color: COLORS.textMid, cursor: "pointer", transition: "color 0.2s", textDecoration: "none" }}
               onMouseEnter={e => e.target.style.color = COLORS.saffron}
               onMouseLeave={e => e.target.style.color = COLORS.textMid}
-            >{item}</span>
+            >{label}</Link>
           ))}
           <Link href="/cart" style={{ position: "relative", cursor: "pointer" }}>
             <span style={{ fontSize: 22 }}>🛒</span>
@@ -192,6 +187,19 @@ export default function StoreFront() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
   const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
+  const [categories, setCategories] = useState([]);
+  const [festivals, setFestivals] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/categories")
+      .then(({ ok, body }) => { if (!cancelled && ok) setCategories(body.data.items || []); })
+      .catch(() => {});
+    apiFetch("/cms/festivals-public")
+      .then(({ ok, body }) => { if (!cancelled && ok) setFestivals((body.data.items || []).slice(0, 4)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,12 +251,12 @@ export default function StoreFront() {
             Order pure, temple-grade puja samagri and get everything delivered anywhere in India.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button style={{ padding: "14px 28px", borderRadius: 12, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+            <Link href="/shop" style={{ padding: "14px 28px", borderRadius: 12, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
               🛒 Shop Samagri
-            </button>
-            <button style={{ padding: "14px 28px", borderRadius: 12, background: "transparent", color: COLORS.saffron, border: `2px solid ${COLORS.saffron}`, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+            </Link>
+            <Link href="/festival" style={{ padding: "14px 28px", borderRadius: 12, background: "transparent", color: COLORS.saffron, border: `2px solid ${COLORS.saffron}`, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
               🪔 Shop Festival Kits
-            </button>
+            </Link>
           </div>
           <div style={{ display: "flex", gap: 32, marginTop: 36 }}>
             {[["15,000+", "Happy Customers"], ["1,250+", "Products"], ["320+", "Puja Kits"], ["4.9★", "Avg Rating"]].map(([v, l]) => (
@@ -279,51 +287,61 @@ export default function StoreFront() {
       </section>
  
       {/* Categories */}
+      {categories.length > 0 && (
       <section style={{ background: COLORS.white, padding: "48px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 28 }}>
             <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 28, color: COLORS.text, margin: 0 }}>Browse by Category</h2>
-            <span style={{ fontSize: 13, color: COLORS.saffron, cursor: "pointer", fontWeight: 600 }}>View all →</span>
+            <Link href="/shop" style={{ fontSize: 13, color: COLORS.saffron, cursor: "pointer", fontWeight: 600, textDecoration: "none" }}>View all →</Link>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
             {categories.map(cat => (
-              <div key={cat.name} style={{ textAlign: "center", cursor: "pointer", padding: "16px 8px", borderRadius: 14, border: `1.5px solid ${COLORS.creamDark}`, background: COLORS.cream, transition: "all 0.2s" }}
+              <Link key={cat._id} href={`/category/${cat.slug}`} style={{ textDecoration: "none", textAlign: "center", cursor: "pointer", padding: "16px 8px", borderRadius: 14, border: `1.5px solid ${COLORS.creamDark}`, background: COLORS.cream, transition: "all 0.2s", display: "block" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.saffron; e.currentTarget.style.background = "#FFF3EC"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.creamDark; e.currentTarget.style.background = COLORS.cream; }}
               >
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{cat.icon}</div>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{DEFAULT_CATEGORY_ICON}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, lineHeight: 1.3, marginBottom: 4 }}>{cat.name}</div>
-                <div style={{ fontSize: 10, color: COLORS.textLight }}>{cat.count} items</div>
-              </div>
+                <div style={{ fontSize: 10, color: COLORS.textLight }}>{cat.productCount} items</div>
+              </Link>
             ))}
           </div>
         </div>
       </section>
+      )}
  
       {/* Festival Campaigns */}
+      {festivals.length > 0 && (
       <section style={{ padding: "48px 24px", maxWidth: 1200, margin: "0 auto" }}>
-        <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 28, color: COLORS.text, margin: "0 0 24px" }}>Festival Collections</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-          {festivals.map(f => (
-            <div key={f.name} style={{ background: f.bg, borderRadius: 16, padding: "24px 20px", cursor: "pointer", border: `1.5px solid transparent`, transition: "all 0.2s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = f.color; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.transform = "translateY(0)"; }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 600, color: f.color, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{f.date}</div>
-              <div style={{ fontFamily: "'Georgia', serif", fontSize: 22, fontWeight: 700, color: COLORS.text, marginBottom: 12 }}>{f.name}</div>
-              <div style={{ fontSize: 12, color: COLORS.textMid, marginBottom: 16 }}>Special kits & complete puja packages</div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: f.color }}>Explore →</span>
-            </div>
-          ))}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
+          <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 28, color: COLORS.text, margin: 0 }}>Festival Collections</h2>
+          <Link href="/festival" style={{ fontSize: 13, color: COLORS.saffron, fontWeight: 600, textDecoration: "none" }}>View all →</Link>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+          {festivals.map(f => {
+            const color = f.color || COLORS.saffron;
+            return (
+              <Link key={f._id} href={`/festival/${f.slug}`} style={{ textDecoration: "none", background: FESTIVAL_BG_FALLBACK, borderRadius: 16, padding: "24px 20px", cursor: "pointer", border: "1.5px solid transparent", transition: "all 0.2s", display: "block" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.transform = "translateY(0)"; }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, color, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{f.status === "active" ? "Live now" : formatFestivalDate(f.startDate)}</div>
+                <div style={{ fontFamily: "'Georgia', serif", fontSize: 22, fontWeight: 700, color: COLORS.text, marginBottom: 12 }}>{f.icon ? `${f.icon} ` : ""}{f.name}</div>
+                <div style={{ fontSize: 12, color: COLORS.textMid, marginBottom: 16 }}>Special kits & complete puja packages</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color }}>Explore →</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
+      )}
  
       {/* Products */}
       <section style={{ background: COLORS.white, padding: "48px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
             <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 28, color: COLORS.text, margin: 0 }}>Top Selling Products</h2>
-            <span style={{ fontSize: 13, color: COLORS.saffron, cursor: "pointer", fontWeight: 600 }}>View all →</span>
+            <Link href="/shop" style={{ fontSize: 13, color: COLORS.saffron, cursor: "pointer", fontWeight: 600, textDecoration: "none" }}>View all →</Link>
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
             {["all", "hawan", "ghee", "phool", "prashad", "festival"].map(tab => (

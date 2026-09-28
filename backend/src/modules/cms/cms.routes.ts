@@ -18,6 +18,30 @@ function modelFor(key: string): Model<any> {
   return m;
 }
 
+// ── Public storefront routes (festivals only) ───────────────────────────────
+// Two extra path segments, so these don't collide with the generic
+// "/:resource" (single segment) route below — Express matches whichever
+// pattern fits the URL shape, and these are registered first anyway.
+
+// GET /api/v1/cms/festivals-public — active/upcoming festivals only, for the
+// storefront's /festival index page.
+router.get("/festivals-public", asyncHandler(async (_req: Request, res: Response) => {
+  const items = await Festival.find({ status: { $in: ["active", "upcoming"] } })
+    .sort({ startDate: 1 })
+    .lean();
+  res.json({ success: true, data: { items } });
+}));
+
+// GET /api/v1/cms/festivals-public/:slug — single festival with its
+// campaign products populated, for the storefront's /festival/[slug] page.
+router.get("/festivals-public/:slug", asyncHandler(async (req: Request, res: Response) => {
+  const item = await Festival.findOne({ slug: req.params.slug, status: { $in: ["active", "upcoming"] } })
+    .populate("productIds")
+    .lean();
+  if (!item) throw new AppError("Festival not found", 404);
+  res.json({ success: true, data: { item } });
+}));
+
 // GET returns everything — filtering by active/status is left to callers
 // (admin UI always wants the full list; a public storefront consumer can
 // filter client-side, since each resource's "is this live" field has a
@@ -30,7 +54,13 @@ router.get("/:resource", asyncHandler(async (req: Request, res: Response) => {
 
 router.post("/:resource", authenticate, requireRole(ADMIN), asyncHandler(async (req: Request, res: Response) => {
   const M = modelFor(req.params.resource);
-  const item = await M.create(req.body);
+  const body = { ...req.body };
+  // Festivals need a URL-friendly slug for the storefront; auto-generate
+  // from name if the admin didn't supply one (same pattern as products).
+  if (req.params.resource === "festivals" && !body.slug && body.name) {
+    body.slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+  const item = await M.create(body);
   res.status(201).json({ success: true, data: { item } });
 }));
 

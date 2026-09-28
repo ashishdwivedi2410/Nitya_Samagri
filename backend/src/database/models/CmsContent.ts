@@ -13,11 +13,15 @@ const bannerSchema = new Schema<IBanner>({
 export const Banner = model<IBanner>("Banner", bannerSchema);
 
 export interface IFestival extends Document {
-  name: string; icon?: string; startDate: Date; endDate: Date; status: "upcoming" | "draft" | "active" | "completed";
+  name: string; slug: string; icon?: string; description?: string; bannerImage?: string;
+  startDate: Date; endDate: Date; status: "upcoming" | "draft" | "active" | "completed";
   color?: string; productIds: string[]; revenue: number;
 }
 const festivalSchema = new Schema<IFestival>({
-  name: { type: String, required: true }, icon: String, startDate: { type: Date, required: true }, endDate: { type: Date, required: true },
+  name: { type: String, required: true },
+  slug: { type: String, required: true, unique: true, index: true },
+  icon: String, description: String, bannerImage: String,
+  startDate: { type: Date, required: true }, endDate: { type: Date, required: true },
   status: { type: String, enum: ["upcoming", "draft", "active", "completed"], default: "draft" },
   color: String, productIds: [{ type: Schema.Types.ObjectId, ref: "Product" }], revenue: { type: Number, default: 0 },
 }, { timestamps: true });
