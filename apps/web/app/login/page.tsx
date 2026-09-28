@@ -176,7 +176,7 @@ export default function LoginPage() {
       }
 
       setDone(true);
-      setTimeout(() => router.push("/account"), 900);
+      setTimeout(() => router.push("/"), 900);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

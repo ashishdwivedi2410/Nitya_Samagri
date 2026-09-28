@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { apiFetch } from "../../lib/auth";
+import { apiFetch, isLoggedIn } from "../../lib/auth";
 import { useCartStore } from "../../lib/cartStore";
  
 const COLORS = {
@@ -118,6 +118,10 @@ function ProductCard({ product, onAddCart }) {
 }
  
 function Navbar({ cartCount }) {
+  // Read login state after mount — it lives in localStorage, so reading it
+  // during render would mismatch the server-rendered HTML.
+  const [loggedIn, setLoggedIn] = useState(false);
+  useEffect(() => { setLoggedIn(isLoggedIn()); }, []);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -159,8 +163,8 @@ function Navbar({ cartCount }) {
               </div>
             )}
           </Link>
-          <Link href="/login" style={{ padding: "8px 18px", borderRadius: 10, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer", textDecoration: "none", display: "inline-block" }}>
-            Login
+          <Link href={loggedIn ? "/account" : "/login"} style={{ padding: "8px 18px", borderRadius: 10, background: COLORS.saffron, color: COLORS.white, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer", textDecoration: "none", display: "inline-block" }}>
+            {loggedIn ? "My Account" : "Login"}
           </Link>
         </div>
       </div>

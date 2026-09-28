@@ -502,11 +502,14 @@ export default function CustomerAccount() {
       {/* Topbar */}
       <nav style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: "0 24px", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <span style={{ fontSize: 20 }}>🪔</span>
             <span style={{ fontFamily: "'Georgia',serif", fontWeight: 700, fontSize: 16, color: C.saffron }}>nityasamagri</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            {[["Home", "/"], ["Shop", "/shop"], ["Festivals", "/festival"], ["🛒 Cart", "/cart"]].map(([label, href]) => (
+              <Link key={label} href={href} style={{ fontSize: 13, fontWeight: 500, color: C.textMid, textDecoration: "none" }}>{label}</Link>
+            ))}
             <div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${C.saffron}, ${C.marigold})`, display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 700, fontSize: 14 }}>{user.avatar}</div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{user.name}</div>

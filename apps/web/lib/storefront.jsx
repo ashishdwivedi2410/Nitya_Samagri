@@ -4,7 +4,8 @@
 // /festival/[slug] pages. Styling mirrors the homepage (inline styles, same
 // palette) so the storefront looks consistent.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { isLoggedIn } from "./auth";
 import Link from "next/link";
 import { useCartStore } from "./cartStore";
 
@@ -52,6 +53,8 @@ export function useAddToCart() {
 export function StoreHeader() {
   const items = useCartStore((s) => s.items);
   const cartCount = items.reduce((s, i) => s + i.qty, 0);
+  const [loggedIn, setLoggedIn] = useState(false);
+  useEffect(() => { setLoggedIn(isLoggedIn()); }, []);
   return (
     <header style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.creamDark}`, position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
@@ -63,6 +66,9 @@ export function StoreHeader() {
           {[["Shop", "/shop"], ["Festivals", "/festival"]].map(([label, href]) => (
             <Link key={label} href={href} style={{ fontSize: 13, fontWeight: 500, color: COLORS.textMid, textDecoration: "none" }}>{label}</Link>
           ))}
+          <Link href={loggedIn ? "/account" : "/login"} style={{ fontSize: 13, fontWeight: 500, color: COLORS.textMid, textDecoration: "none" }}>
+            {loggedIn ? "My Account" : "Login"}
+          </Link>
           <Link href="/cart" style={{ fontSize: 13, fontWeight: 600, color: COLORS.saffron, textDecoration: "none" }}>
             🛒 Cart{cartCount > 0 ? ` (${cartCount})` : ""}
           </Link>
