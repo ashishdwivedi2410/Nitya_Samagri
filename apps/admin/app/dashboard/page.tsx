@@ -4,7 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import useSWR from "swr";
 import RequireAuth from "../_components/RequireAuth";
-import { clearAdminSession } from "../_lib/adminAuth";
+import { clearAdminSession, getAdminSession } from "../_lib/adminAuth";
 import { api } from "../_lib/api";
 import { useRouter } from "next/navigation";
 
@@ -688,6 +688,9 @@ const SIDEBAR_NAV = [
     { id:"inventory", label:"Inventory",    icon:"🏭", route:"/inventory" },
     { id:"coupons",   label:"Coupons",      icon:"🎟️", route:"/coupons" },
   ]},
+  { group:"Admin", items:[
+    { id:"team",      label:"Team & Roles", icon:"👥", route:"/team", superAdminOnly:true },
+  ]},
   { group:"System", items:[
     { id:"settings",  label:"Settings",     icon:"⚙️", disabled:true },
     { id:"logs",      label:"Audit Logs",   icon:"📋", disabled:true },
@@ -698,6 +701,7 @@ export default function AdminDashboard() {
   const [view, setView] = useState("overview");
   const router = useRouter();
   const logOut = () => { clearAdminSession(); router.push("/login"); };
+  const myRole = typeof window !== "undefined" ? getAdminSession()?.user?.role : undefined;
 
   return (
     <RequireAuth>
@@ -718,10 +722,10 @@ export default function AdminDashboard() {
 
         {/* Nav groups */}
         <div style={{ flex:1, padding:"12px 10px" }}>
-          {SIDEBAR_NAV.map(group=>(
+          {SIDEBAR_NAV.filter(group=>group.items.some(item=>!item.superAdminOnly||myRole==="super_admin")).map(group=>(
             <div key={group.group} style={{ marginBottom:20 }}>
               <div style={{ fontSize:9, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:1.2, padding:"0 8px", marginBottom:6 }}>{group.group}</div>
-              {group.items.map(item=>(
+              {group.items.filter(item=>!item.superAdminOnly||myRole==="super_admin").map(item=>(
                 <button key={item.id} onClick={()=>{ if(item.disabled) return; if(item.route) router.push(item.route); else setView(item.id); }} style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"9px 10px", borderRadius:9, border:"none", background:view===item.id?C.saffronBg:"transparent", color:view===item.id?C.saffron:item.disabled?C.textLight:C.textMid, fontWeight:view===item.id?700:400, fontSize:13, cursor:item.disabled?"not-allowed":"pointer", marginBottom:2, transition:"all 0.15s", opacity:item.disabled?0.4:1, borderLeft:`3px solid ${view===item.id?C.saffron:"transparent"}`, textAlign:"left" }}>
                   <span style={{ fontSize:15 }}>{item.icon}</span>
                   {item.label}

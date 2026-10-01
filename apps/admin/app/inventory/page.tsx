@@ -204,7 +204,7 @@ export default function InventoryModule() {
             </div>
           </div>
           <div style={{ flex: 1, padding: "12px 10px" }}>
-            {[["/dashboard", "📊", "Dashboard"], ["/products", "🏷️", "Products"], ["/inventory", "🏭", "Inventory"], ["/coupons", "🎟️", "Coupons"], ["/store", "🎨", "Store Management"]].map(([href, icon, label]) => (
+            {[["/dashboard", "📊", "Dashboard"], ["/products", "🏷️", "Products"], ["/inventory", "🏭", "Inventory"], ["/coupons", "🎟️", "Coupons"], ["/store", "🎨", "Store Management"], ["/team", "👥", "Team & Roles"]].map(([href, icon, label]) => (
               <button key={href as string} onClick={() => router.push(href as string)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 10px", borderRadius: 9, border: "none", background: href === "/inventory" ? `${C.sbAccent}22` : "transparent", color: href === "/inventory" ? C.sbAccent : C.sbText, fontWeight: href === "/inventory" ? 700 : 400, fontSize: 13, cursor: "pointer", marginBottom: 4, textAlign: "left", borderLeft: `3px solid ${href === "/inventory" ? C.sbAccent : "transparent"}` }}>
                 <span style={{ fontSize: 16 }}>{icon}</span>{label}
               </button>

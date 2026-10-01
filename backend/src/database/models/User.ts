@@ -7,6 +7,13 @@ export interface IUser extends Document {
   email?: string;
   password?: string;
   role: "customer" | "admin" | "super_admin" | "order_manager" | "warehouse" | "pandit" | "support";
+  // Fine-grained permissions for the Team & Roles system (additive on top of
+  // `role`; super_admin implicitly has every permission regardless of this
+  // list — see requirePermission() in rbac.middleware.ts). Only meaningful
+  // for staff accounts, not customers.
+  permissions: string[];
+  roleTemplate?: Types.ObjectId; // which Role template this was last set up from, for display only
+  invitedBy?: Types.ObjectId;
   status: "active" | "blocked";
   isVerified: boolean;
   loyaltyPoints: number;
@@ -26,6 +33,9 @@ const userSchema = new Schema<IUser>(
     email: { type: String, lowercase: true, trim: true, index: true, sparse: true, unique: true },
     password: { type: String, select: false },
     role: { type: String, enum: ["customer", "admin", "super_admin", "order_manager", "warehouse", "pandit", "support"], default: "customer" },
+    permissions: [{ type: String }],
+    roleTemplate: { type: Schema.Types.ObjectId, ref: "Role" },
+    invitedBy: { type: Schema.Types.ObjectId, ref: "User" },
     status: { type: String, enum: ["active", "blocked"], default: "active", index: true },
     isVerified: { type: Boolean, default: false },
     loyaltyPoints: { type: Number, default: 0 },
