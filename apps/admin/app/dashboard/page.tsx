@@ -676,7 +676,21 @@ const NAV = [
   { id:"reports",  label:"Reports",   icon:"📈" },
 ];
 
-const SIDEBAR_NAV = [
+type SidebarNavItem = {
+  id: string;
+  label: string;
+  icon: string;
+  route?: string;
+  superAdminOnly?: boolean;
+  disabled?: boolean;
+};
+
+type SidebarNavGroup = {
+  group: string;
+  items: SidebarNavItem[];
+};
+
+const SIDEBAR_NAV: SidebarNavGroup[] = [
   { group:"Core", items:[
     { id:"overview",  label:"Overview",     icon:"📊" },
     { id:"orders",    label:"Orders",       icon:"📦" },
