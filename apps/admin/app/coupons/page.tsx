@@ -12,7 +12,7 @@ function adaptCoupon(c: any) {
   return {
     id: c._id, code: c.code, type: c.type, value: c.value, maxDiscount: c.maxDiscount || 0,
     minOrder: c.minOrderValue || 0, usageLimit: c.usageLimit ?? null, usedCount: c.usedCount || 0,
-    isActive: c.isActive, expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
+    isActive: c.isActive, startsAt: c.startsAt ? c.startsAt.slice(0, 10) : "", expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
     desc: c.desc || "", applicableTo: "all", category: "", festivalTag: "",
     createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "",
   };
@@ -64,8 +64,9 @@ function typeLabel(type) {
   return { flat:"₹ Flat Off", percent:"% Percentage", shipping:"🚚 Free Shipping" }[type] || type;
 }
 
-function StatusPill({ active, expired }) {
+function StatusPill({ active, expired, scheduled }) {
   if (expired) return <span style={{ display:"inline-flex",alignItems:"center",gap:4,background:C.redBg,color:C.red,fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:999 }}>✕ Expired</span>;
+  if (scheduled) return <span style={{ display:"inline-flex",alignItems:"center",gap:4,background:C.blueBg,color:C.blue,fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:999 }}>🕒 Scheduled</span>;
   return <span style={{ display:"inline-flex",alignItems:"center",gap:4,background:active?C.greenBg:C.bgHover,color:active?C.green:C.textLight,fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:999 }}><span style={{ width:5,height:5,borderRadius:"50%",background:active?C.green:C.textLight }}/>{active?"Active":"Paused"}</span>;
 }
 
@@ -109,6 +110,7 @@ function Toggle({ on, onChange }) {
 // ─── COUPON CARD (ticket shape) ────────────────────────────────────────────────
 function CouponTicket({ coupon, onToggle, onEdit, onDelete, selected, onClick }) {
   const isExpired = new Date(coupon.expiresAt) < new Date();
+  const isScheduled = !!coupon.startsAt && new Date(coupon.startsAt) > new Date();
   const usagePct  = coupon.usageLimit ? Math.round((coupon.usedCount / coupon.usageLimit) * 100) : null;
 
   return (
@@ -129,11 +131,12 @@ function CouponTicket({ coupon, onToggle, onEdit, onDelete, selected, onClick })
         <div style={{ flex:1 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
             <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{coupon.desc}</div>
-            <StatusPill active={coupon.isActive} expired={isExpired}/>
+            <StatusPill active={coupon.isActive} expired={isExpired} scheduled={isScheduled}/>
           </div>
           <div style={{ display:"flex", gap:12, flexWrap:"wrap", fontSize:12, color:C.textLight, marginBottom:8 }}>
             <span>Min: ₹{coupon.minOrder}</span>
             {coupon.maxDiscount>0 && <span>Max: ₹{coupon.maxDiscount}</span>}
+            {coupon.startsAt && <span>Starts: {coupon.startsAt}</span>}
             <span>Expires: {coupon.expiresAt}</span>
             {coupon.usageLimit && <span>Limit: {coupon.usageLimit}</span>}
           </div>
@@ -165,7 +168,7 @@ function CouponTicket({ coupon, onToggle, onEdit, onDelete, selected, onClick })
           <button onClick={e=>{e.stopPropagation();onDelete(coupon.id);}} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${C.red}22`, background:C.redBg, color:C.red, fontSize:11, fontWeight:600, cursor:"pointer" }}>🗑️ Delete</button>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:11, color:C.textLight }}>{coupon.isActive?"Live":"Paused"}</span>
+          <span style={{ fontSize:11, color:C.textLight }}>{coupon.isActive?(isScheduled?"Scheduled":"Live"):"Paused"}</span>
           <Toggle on={coupon.isActive && !isExpired} onChange={()=>!isExpired&&onToggle(coupon.id)}/>
         </div>
       </div>
@@ -174,7 +177,7 @@ function CouponTicket({ coupon, onToggle, onEdit, onDelete, selected, onClick })
 }
 
 // ─── ADMIN CREATE / EDIT FORM ─────────────────────────────────────────────────
-const EMPTY_FORM = { code:"", type:"percent", value:"", maxDiscount:"", minOrder:"", usageLimit:"", isActive:true, expiresAt:"", desc:"", applicableTo:"all", category:"", festivalTag:"" };
+const EMPTY_FORM = { code:"", type:"percent", value:"", maxDiscount:"", minOrder:"", usageLimit:"", isActive:true, startsAt:"", expiresAt:"", desc:"", applicableTo:"all", category:"", festivalTag:"" };
 
 function CouponForm({ initial, onSave, onCancel }) {
   const [form, setForm]   = useState(initial || EMPTY_FORM);
@@ -235,7 +238,13 @@ function CouponForm({ initial, onSave, onCancel }) {
           <Input label="Description" value={form.desc} onChange={upd("desc")} placeholder="e.g. 20% off — Diwali special" helper="Shown to customers"/>
           <Input label="Min Order Value (₹)" type="number" value={form.minOrder} onChange={upd("minOrder")} placeholder="e.g. 499" prefix="₹"/>
           <Input label="Usage Limit" type="number" value={form.usageLimit} onChange={upd("usageLimit")} placeholder="Leave blank for unlimited" helper="Total uses across all customers"/>
-          <Input label="Expiry Date" type="date" value={form.expiresAt} onChange={upd("expiresAt")}/>
+          <div style={{ display:"flex", gap:10 }}>
+            <div style={{ flex:1 }}><Input label="Start Date (optional)" type="date" value={form.startsAt} onChange={upd("startsAt")} helper="Leave blank to make it live immediately"/></div>
+            <div style={{ flex:1 }}><Input label="Expiry Date" type="date" value={form.expiresAt} onChange={upd("expiresAt")}/></div>
+          </div>
+          {form.startsAt && form.expiresAt && form.startsAt >= form.expiresAt && (
+            <p style={{ fontSize:11, color:C.red, fontWeight:600, margin:"-8px 0 12px" }}>⚠️ Start date must be before the expiry date</p>
+          )}
         </div>
       </div>
 
@@ -295,12 +304,14 @@ function CouponForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
+      {(() => { const dateInvalid = form.startsAt && form.expiresAt && form.startsAt >= form.expiresAt; return (
       <div style={{ display:"flex", gap:10 }}>
-        <button onClick={()=>onSave(form)} style={{ flex:1, padding:"12px", borderRadius:11, border:"none", background:C.saffron, color:C.white, fontWeight:700, fontSize:14, cursor:"pointer" }}>
+        <button onClick={()=>!dateInvalid&&onSave(form)} disabled={dateInvalid} style={{ flex:1, padding:"12px", borderRadius:11, border:"none", background:dateInvalid?C.border:C.saffron, color:dateInvalid?C.textLight:C.white, fontWeight:700, fontSize:14, cursor:dateInvalid?"not-allowed":"pointer" }}>
           {initial?.id?"💾 Save Changes":"✨ Create Coupon"}
         </button>
         <button onClick={onCancel} style={{ padding:"12px 20px", borderRadius:11, border:`1.5px solid ${C.border}`, background:C.white, color:C.textMid, fontWeight:600, fontSize:14, cursor:"pointer" }}>Cancel</button>
       </div>
+      ); })()}
     </Card>
   );
 }
@@ -314,7 +325,7 @@ function CustomerCouponApply({ orderValue=799 }) {
   const [loading,  setLoading]  = useState(false);
   const [showList, setShowList] = useState(false);
 
-  const publicCoupons = (allCoupons || []).filter(c=>c.isActive && new Date(c.expiresAt)>=new Date() && (c.usageLimit===null||c.usedCount<c.usageLimit));
+  const publicCoupons = (allCoupons || []).filter(c=>c.isActive && new Date(c.expiresAt)>=new Date() && (!c.startsAt||new Date(c.startsAt)<=new Date()) && (c.usageLimit===null||c.usedCount<c.usageLimit));
 
   const apply = (code) => {
     setError(""); setLoading(true);
@@ -322,6 +333,7 @@ function CustomerCouponApply({ orderValue=799 }) {
       const coupon = (allCoupons || []).find(c=>c.code===code.trim().toUpperCase());
       if (!coupon)           { setError("Invalid coupon code. Please check and try again."); setLoading(false); return; }
       if (!coupon.isActive)  { setError("This coupon is currently paused."); setLoading(false); return; }
+      if (coupon.startsAt && new Date(coupon.startsAt)>new Date()) { setError(`This coupon isn't active yet. It starts on ${coupon.startsAt}.`); setLoading(false); return; }
       if (new Date(coupon.expiresAt)<new Date()) { setError("This coupon has expired."); setLoading(false); return; }
       if (orderValue < coupon.minOrder) { setError(`Minimum order of ₹${coupon.minOrder} required for this coupon.`); setLoading(false); return; }
       setApplied(coupon); setLoading(false); setShowList(false);
@@ -425,11 +437,13 @@ function AdminCoupons() {
   const [editing, setEditing]   = useState<any | null>(null);
   const [selected,setSelected]  = useState<string | null>(null);
 
-  const filters = ["All","Active","Paused","Expired","Festival"];
+  const filters = ["All","Active","Scheduled","Paused","Expired","Festival"];
   const isExpired = c => new Date(c.expiresAt) < new Date();
+  const isScheduled = c => !!c.startsAt && new Date(c.startsAt) > new Date();
 
   const filtered = (coupons || []).filter(c=>{
-    if (filter==="Active"  && (!c.isActive||isExpired(c))) return false;
+    if (filter==="Active"    && (!c.isActive||isExpired(c)||isScheduled(c))) return false;
+    if (filter==="Scheduled" && (!c.isActive||isExpired(c)||!isScheduled(c))) return false;
     if (filter==="Paused"  && c.isActive)                  return false;
     if (filter==="Expired" && !isExpired(c))               return false;
     if (filter==="Festival"&& !c.festivalTag)              return false;
@@ -452,6 +466,7 @@ function AdminCoupons() {
       code: form.code, desc: form.desc, type: form.type, value: form.value,
       maxDiscount: form.maxDiscount || undefined, minOrderValue: form.minOrder || 0,
       usageLimit: form.usageLimit || undefined, isActive: form.isActive,
+      startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
       expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
     };
     if (editing?.id) {

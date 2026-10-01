@@ -158,6 +158,7 @@ async function restockOrderItems(orderId: mongoose.Types.ObjectId, session: Clie
 async function applyCoupon(code: string, subtotal: number, session: ClientSession) {
   const coupon = await Coupon.findOne({ code }).session(session);
   if (!coupon || !coupon.isActive) throw new AppError("Invalid coupon code", 400);
+  if (coupon.startsAt && coupon.startsAt > new Date()) throw new AppError("This coupon is not active yet", 400);
   if (coupon.expiresAt && coupon.expiresAt < new Date()) throw new AppError("Coupon expired", 400);
   if (subtotal < coupon.minOrderValue) throw new AppError(`Minimum order ₹${coupon.minOrderValue} required`, 400);
   if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) throw new AppError("Coupon usage limit reached", 400);

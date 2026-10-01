@@ -684,9 +684,9 @@ const SIDEBAR_NAV = [
     { id:"reports",   label:"Reports",      icon:"📈" },
   ]},
   { group:"Management", items:[
-    { id:"products",  label:"Products",     icon:"🏷️", disabled:true },
-    { id:"inventory", label:"Inventory",    icon:"🏭", disabled:true },
-    { id:"coupons",   label:"Coupons",      icon:"🎟️", disabled:true },
+    { id:"products",  label:"Products",     icon:"🏷️", route:"/products" },
+    { id:"inventory", label:"Inventory",    icon:"🏭", route:"/inventory" },
+    { id:"coupons",   label:"Coupons",      icon:"🎟️", route:"/coupons" },
   ]},
   { group:"System", items:[
     { id:"settings",  label:"Settings",     icon:"⚙️", disabled:true },
@@ -722,7 +722,7 @@ export default function AdminDashboard() {
             <div key={group.group} style={{ marginBottom:20 }}>
               <div style={{ fontSize:9, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:1.2, padding:"0 8px", marginBottom:6 }}>{group.group}</div>
               {group.items.map(item=>(
-                <button key={item.id} onClick={()=>!item.disabled&&setView(item.id)} style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"9px 10px", borderRadius:9, border:"none", background:view===item.id?C.saffronBg:"transparent", color:view===item.id?C.saffron:item.disabled?C.textLight:C.textMid, fontWeight:view===item.id?700:400, fontSize:13, cursor:item.disabled?"not-allowed":"pointer", marginBottom:2, transition:"all 0.15s", opacity:item.disabled?0.4:1, borderLeft:`3px solid ${view===item.id?C.saffron:"transparent"}`, textAlign:"left" }}>
+                <button key={item.id} onClick={()=>{ if(item.disabled) return; if(item.route) router.push(item.route); else setView(item.id); }} style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"9px 10px", borderRadius:9, border:"none", background:view===item.id?C.saffronBg:"transparent", color:view===item.id?C.saffron:item.disabled?C.textLight:C.textMid, fontWeight:view===item.id?700:400, fontSize:13, cursor:item.disabled?"not-allowed":"pointer", marginBottom:2, transition:"all 0.15s", opacity:item.disabled?0.4:1, borderLeft:`3px solid ${view===item.id?C.saffron:"transparent"}`, textAlign:"left" }}>
                   <span style={{ fontSize:15 }}>{item.icon}</span>
                   {item.label}
                   {item.disabled&&<span style={{ marginLeft:"auto", fontSize:9, color:C.textLight }}>soon</span>}

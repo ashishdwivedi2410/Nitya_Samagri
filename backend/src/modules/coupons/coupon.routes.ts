@@ -12,7 +12,7 @@ import { paginate } from "../../utils/paginate";
 const router = Router();
 const ADMIN = ["admin", "super_admin"];
 
-const CouponSchema = z.object({
+const CouponBaseSchema = z.object({
   code: z.string().min(3).max(30),
   desc: z.string().max(200).optional(),
   type: z.enum(["percent", "flat"]),
@@ -21,7 +21,18 @@ const CouponSchema = z.object({
   minOrderValue: z.number().min(0).default(0),
   usageLimit: z.number().int().positive().optional(),
   isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional(),
   expiresAt: z.string().datetime().optional(),
+});
+const dateOrderCheck = (d: { startsAt?: string; expiresAt?: string }) =>
+  !d.startsAt || !d.expiresAt || new Date(d.startsAt) < new Date(d.expiresAt);
+const CouponSchema = CouponBaseSchema.refine(dateOrderCheck, {
+  message: "Start date must be before expiry date",
+  path: ["startsAt"],
+});
+const CouponUpdateSchema = CouponBaseSchema.partial().refine(dateOrderCheck, {
+  message: "Start date must be before expiry date",
+  path: ["startsAt"],
 });
 
 router.get("/", authenticate, requireRole(ADMIN), asyncHandler(async (req: Request, res: Response) => {
@@ -46,7 +57,7 @@ router.post("/", authenticate, requireRole(ADMIN), validate(CouponSchema), async
   res.status(201).json({ success: true, data: { coupon } });
 }));
 
-router.patch("/:id", authenticate, requireRole(ADMIN), validate(CouponSchema.partial()), asyncHandler(async (req: Request, res: Response) => {
+router.patch("/:id", authenticate, requireRole(ADMIN), validate(CouponUpdateSchema), asyncHandler(async (req: Request, res: Response) => {
   const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
   if (!coupon) throw new AppError("Coupon not found", 404);
   res.json({ success: true, data: { coupon } });

@@ -12,6 +12,7 @@ export interface ICoupon extends Document {
   usageLimit?: number;
   usedCount: number;
   isActive: boolean;
+  startsAt?: Date;
   expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,9 @@ const couponSchema = new Schema<ICoupon>(
     usageLimit: { type: Number },
     usedCount: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+    // Scheduling: coupon is only usable between startsAt and expiresAt.
+    // Leaving startsAt unset means "usable immediately".
+    startsAt: { type: Date },
     expiresAt: { type: Date },
   },
   { timestamps: true }

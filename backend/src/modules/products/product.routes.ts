@@ -90,6 +90,17 @@ const ProductQuerySchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
+const AdminProductQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+  categoryId: objectId().optional(),
+  status: z.enum(["draft", "active", "archived", "all"]).default("all"),
+  stockFilter: z.enum(["all", "low", "out", "in"]).default("all"),
+  sortBy: z.enum(["price", "createdAt", "name", "stock", "sold"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
 // ── Public routes ─────────────────────────────────────────────────────────────
 
 /**
@@ -211,6 +222,86 @@ router.get(
         price: { min: Math.floor(priceAgg[0]?.min ?? 0), max: Math.ceil(priceAgg[0]?.max ?? 0) },
       },
     });
+  })
+);
+
+/**
+ * GET /api/v1/products/admin/all
+ * Admin listing: every status (draft/active/archived/all), stock filters,
+ * and summary counts for the admin Products/Inventory pages. Kept separate
+ * from the public GET / so draft/archived stock and pricing never leak to
+ * unauthenticated requests. Registered before "/:slug" since Express
+ * matches path segment-count, but kept explicit for clarity.
+ */
+router.get(
+  "/admin/all",
+  authenticate,
+  requireRole(["admin", "super_admin", "warehouse"]),
+  validate(AdminProductQuerySchema, "query"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as unknown as z.infer<typeof AdminProductQuerySchema>;
+
+    const filter: Record<string, unknown> = {};
+    if (q.status !== "all") filter.status = q.status;
+    if (q.categoryId) filter.categoryId = q.categoryId;
+    if (q.q) filter.$text = { $search: q.q };
+    if (q.stockFilter === "out") filter.stock = 0;
+    if (q.stockFilter === "in") filter.stock = { $gt: 0 };
+    if (q.stockFilter === "low") {
+      filter.$expr = { $and: [{ $gt: ["$stock", 0] }, { $lte: ["$stock", "$lowStockAt"] }] };
+    }
+
+    const { skip, take } = paginate(q.page, q.limit);
+    const sort: Record<string, 1 | -1> = { [q.sortBy]: q.sortOrder === "asc" ? 1 : -1 };
+
+    const [products, total, byStatus, lowStockCount, outOfStockCount, allCount] = await Promise.all([
+      Product.find(filter).populate("categoryId", "name").populate("brandId", "name").sort(sort).skip(skip).limit(take).lean(),
+      Product.countDocuments(filter),
+      Product.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Product.countDocuments({ $expr: { $and: [{ $gt: ["$stock", 0] }, { $lte: ["$stock", "$lowStockAt"] }] } }),
+      Product.countDocuments({ stock: 0 }),
+      Product.countDocuments(),
+    ]);
+
+    const productIds = products.map((p) => p._id);
+    const variants = await ProductVariant.find({ productId: { $in: productIds } }).lean();
+    const variantsByProduct = new Map<string, typeof variants>();
+    for (const v of variants) {
+      const key = String(v.productId);
+      if (!variantsByProduct.has(key)) variantsByProduct.set(key, []);
+      variantsByProduct.get(key)!.push(v);
+    }
+    const productsWithVariants = products.map((p) => ({ ...p, variants: variantsByProduct.get(String(p._id)) || [] }));
+
+    const statusCounts: Record<string, number> = { draft: 0, active: 0, archived: 0 };
+    for (const s of byStatus) if (s._id) statusCounts[s._id as string] = s.count;
+
+    res.json({
+      success: true,
+      data: {
+        products: productsWithVariants,
+        pagination: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) },
+        stats: { total: allCount, byStatus: statusCounts, lowStockCount, outOfStockCount },
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/products/admin/:id/logs
+ * Inventory audit trail for one product (recent stock adjustments).
+ */
+router.get(
+  "/admin/:id/logs",
+  authenticate,
+  requireRole(["admin", "super_admin", "warehouse"]),
+  asyncHandler(async (req: Request, res: Response) => {
+    const logs = await InventoryLog.find({ productId: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate("performedBy", "name")
+      .lean();
+    res.json({ success: true, data: { logs } });
   })
 );
 
