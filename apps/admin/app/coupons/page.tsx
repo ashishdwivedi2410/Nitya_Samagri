@@ -462,10 +462,14 @@ function AdminCoupons() {
     mutate();
   };
   const save    = async (form) => {
+    // Inputs hand back strings (even type="number" ones) — the backend's
+    // zod schema expects real numbers, so empty/blank optional fields must
+    // become `undefined` rather than NaN or "".
+    const num = (v) => (v === "" || v === null || v === undefined ? undefined : Number(v));
     const payload = {
-      code: form.code, desc: form.desc, type: form.type, value: form.value,
-      maxDiscount: form.maxDiscount || undefined, minOrderValue: form.minOrder || 0,
-      usageLimit: form.usageLimit || undefined, isActive: form.isActive,
+      code: form.code.trim().toUpperCase(), desc: form.desc || undefined, type: form.type, value: num(form.value),
+      maxDiscount: num(form.maxDiscount), minOrderValue: num(form.minOrder) ?? 0,
+      usageLimit: num(form.usageLimit), isActive: form.isActive,
       startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
       expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
     };

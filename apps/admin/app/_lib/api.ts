@@ -41,7 +41,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new ApiError(body?.message || body?.errors?.[0]?.message || "Something went wrong", res.status);
+    // Prefer the field-level validation errors (e.g. "categoryId: Invalid ID")
+    // over the generic top-level "Validation failed" message, so the UI can
+    // actually tell the person what to fix.
+    const detail = Array.isArray(body?.errors) && body.errors.length
+      ? body.errors.map((e: { field?: string; message: string }) => (e.field ? `${e.field}: ${e.message}` : e.message)).join("; ")
+      : undefined;
+    throw new ApiError(detail || body?.message || "Something went wrong", res.status);
   }
 
   return body as T;

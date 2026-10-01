@@ -112,9 +112,16 @@ function PickerWithCreate({ label, value, onChange, items, onCreate, placeholder
 }
 
 // ─── PRODUCT FORM ───────────────────────────────────────────────────────────
-function ProductForm({ initial, categories, brands, onSave, onCancel, onCreateCategory, onCreateBrand }: any) {
+function ProductForm({ initial, categories, brands, onSave, onCancel, onCreateCategory, onCreateBrand, error }: any) {
   const [form, setForm] = useState<any>(initial || EMPTY_FORM);
   const [autoSlug, setAutoSlug] = useState(!initial);
+  const [touched, setTouched] = useState(false);
+  const missing: string[] = [];
+  if (!form.name?.trim()) missing.push("Product Name");
+  if (!form.categoryId) missing.push("Category");
+  if (!form.sku?.trim()) missing.push("SKU");
+  if (!form.mrp) missing.push("MRP");
+  if (!form.price) missing.push("Selling Price");
   const upd = (k: string) => (e: any) => {
     const val = e?.target ? (e.target.type === "checkbox" ? e.target.checked : e.target.value) : e;
     setForm((f: any) => {
@@ -131,17 +138,18 @@ function ProductForm({ initial, categories, brands, onSave, onCancel, onCreateCa
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div>
-          <Input label="Product Name" value={form.name} onChange={upd("name")} placeholder="e.g. Pure Cow Ghee 500ml" />
+          <Input label="Product Name *" value={form.name} onChange={upd("name")} placeholder="e.g. Pure Cow Ghee 500ml" />
           <Input label="Slug" value={form.slug} onChange={e => { setAutoSlug(false); upd("slug")(e); }} placeholder="pure-cow-ghee-500ml" helper="Auto-generated from name; edit if you need a custom URL" />
-          <PickerWithCreate label="Category" value={form.categoryId} onChange={upd("categoryId")} items={categories} onCreate={onCreateCategory} placeholder="Select category…" />
+          <PickerWithCreate label="Category *" value={form.categoryId} onChange={upd("categoryId")} items={categories} onCreate={onCreateCategory} placeholder="Select category…" />
+          {categories.length === 0 && <p style={{ fontSize: 11, color: "#B8790A", margin: "-10px 0 14px" }}>⚠️ No categories exist yet — click "+ New" above to create one before saving.</p>}
           <PickerWithCreate label="Brand (optional)" value={form.brandId} onChange={upd("brandId")} items={brands} onCreate={onCreateBrand} placeholder="Select brand…" />
-          <Input label="SKU" value={form.sku} onChange={upd("sku")} placeholder="e.g. GHEE-500-001" />
+          <Input label="SKU *" value={form.sku} onChange={upd("sku")} placeholder="e.g. GHEE-500-001" />
           <Input label="Tags (comma separated)" value={form.tags} onChange={upd("tags")} placeholder="ghee, puja, pure" />
         </div>
         <div>
           <div style={{ display: "flex", gap: 10 }}>
-            <Input label="MRP (₹)" type="number" value={form.mrp} onChange={upd("mrp")} prefix="₹" />
-            <Input label="Selling Price (₹)" type="number" value={form.price} onChange={upd("price")} prefix="₹" />
+            <Input label="MRP (₹) *" type="number" value={form.mrp} onChange={upd("mrp")} prefix="₹" />
+            <Input label="Selling Price (₹) *" type="number" value={form.price} onChange={upd("price")} prefix="₹" />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <Input label="Cost Price (₹)" type="number" value={form.costPrice} onChange={upd("costPrice")} prefix="₹" helper="Internal only" />
@@ -182,8 +190,17 @@ function ProductForm({ initial, categories, brands, onSave, onCancel, onCreateCa
         </div>
       </div>
 
+      {error && (
+        <div style={{ background: C.redBg, color: C.red, border: `1px solid ${C.red}33`, borderRadius: 9, padding: "10px 14px", fontSize: 12, fontWeight: 600, marginBottom: 14 }}>⚠️ {error}</div>
+      )}
+      {touched && missing.length > 0 && (
+        <div style={{ background: C.marigoldBg, color: "#B8790A", border: "1px solid #B8790A33", borderRadius: 9, padding: "10px 14px", fontSize: 12, fontWeight: 600, marginBottom: 14 }}>
+          Please fill in: {missing.join(", ")}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={() => onSave(form)} style={{ flex: 1, padding: 12, borderRadius: 11, border: "none", background: C.saffron, color: C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+        <button onClick={() => { setTouched(true); if (missing.length === 0) onSave(form); }} style={{ flex: 1, padding: 12, borderRadius: 11, border: "none", background: C.saffron, color: C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
           {initial?._id ? "💾 Save Changes" : "✨ Create Product"}
         </button>
         <button onClick={onCancel} style={{ padding: "12px 20px", borderRadius: 11, border: `1.5px solid ${C.border}`, background: C.white, color: C.textMid, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancel</button>
@@ -227,6 +244,7 @@ function AdminProducts() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const qs = new URLSearchParams({ status: tab, page: String(page), limit: "20", ...(search ? { q: search } : {}), ...(categoryId ? { categoryId } : {}) }).toString();
   const { data, mutate, isLoading } = useSWR(`/api/v1/products/admin/all?${qs}`, productsFetcher);
@@ -238,14 +256,24 @@ function AdminProducts() {
   const pagination = data?.pagination || { pages: 1 };
 
   const createCategory = async (name: string) => {
-    const res = await api.post<{ data: { category: any } }>("/api/v1/categories", { name });
-    mutateCats();
-    return res.data.category;
+    try {
+      const res = await api.post<{ data: { category: any } }>("/api/v1/categories", { name });
+      mutateCats();
+      return res.data.category;
+    } catch (e: any) {
+      setFormError(e?.message || "Couldn't create category");
+      throw e;
+    }
   };
   const createBrand = async (name: string) => {
-    const res = await api.post<{ data: { brand: any } }>("/api/v1/brands", { name });
-    mutateBrands();
-    return res.data.brand;
+    try {
+      const res = await api.post<{ data: { brand: any } }>("/api/v1/brands", { name });
+      mutateBrands();
+      return res.data.brand;
+    } catch (e: any) {
+      setFormError(e?.message || "Couldn't create brand");
+      throw e;
+    }
   };
 
   const buildPayload = (form: any) => ({
@@ -259,13 +287,18 @@ function AdminProducts() {
   });
 
   const save = async (form: any) => {
+    setFormError(null);
     const payload = buildPayload(form);
-    if (editing?._id) await api.patch(`/api/v1/products/${editing._id}`, payload);
-    else await api.post("/api/v1/products", payload);
-    mutate(); setShowForm(false); setEditing(null);
+    try {
+      if (editing?._id) await api.patch(`/api/v1/products/${editing._id}`, payload);
+      else await api.post("/api/v1/products", payload);
+      mutate(); setShowForm(false); setEditing(null);
+    } catch (e: any) {
+      setFormError(e?.message || "Couldn't save this product. Please check the fields and try again.");
+    }
   };
-  const setStatus = async (p: any, status: string) => { await api.patch(`/api/v1/products/${p._id}`, { status }); mutate(); };
-  const archive = async (p: any) => { await api.delete(`/api/v1/products/${p._id}`); mutate(); };
+  const setStatus = async (p: any, status: string) => { try { await api.patch(`/api/v1/products/${p._id}`, { status }); mutate(); } catch (e: any) { alert(e?.message || "Couldn't update status"); } };
+  const archive = async (p: any) => { try { await api.delete(`/api/v1/products/${p._id}`); mutate(); } catch (e: any) { alert(e?.message || "Couldn't archive product"); } };
 
   const STAT_CARDS = [
     { label: "Total Products", value: stats.total, icon: "📦", color: C.saffron },
@@ -290,8 +323,8 @@ function AdminProducts() {
 
       {(showForm || editing) && (
         <div style={{ marginBottom: 24 }}>
-          <ProductForm initial={editing} categories={categories} brands={brands}
-            onSave={save} onCancel={() => { setShowForm(false); setEditing(null); }}
+          <ProductForm initial={editing} categories={categories} brands={brands} error={formError}
+            onSave={save} onCancel={() => { setShowForm(false); setEditing(null); setFormError(null); }}
             onCreateCategory={createCategory} onCreateBrand={createBrand} />
         </div>
       )}
@@ -309,7 +342,7 @@ function AdminProducts() {
             <button key={k} onClick={() => { setTab(k); setPage(1); }} style={{ padding: "8px 14px", borderRadius: 999, border: `1.5px solid ${tab === k ? C.saffron : C.border}`, background: tab === k ? C.saffron : "transparent", color: tab === k ? C.white : C.textMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{l}</button>
           ))}
         </div>
-        {!showForm && !editing && <button onClick={() => setShowForm(true)} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: C.saffron, color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>+ Add Product</button>}
+        {!showForm && !editing && <button onClick={() => { setFormError(null); setShowForm(true); }} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: C.saffron, color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>+ Add Product</button>}
       </div>
 
       <Card style={{ overflow: "hidden" }}>
@@ -320,7 +353,7 @@ function AdminProducts() {
         {!isLoading && products.length === 0 && <div style={{ padding: 32, textAlign: "center", color: C.textLight, fontSize: 13 }}>No products match your filters.</div>}
         {products.map((p: any) => (
           <ProductRow key={p._id} p={p}
-            onEdit={(prod: any) => { setEditing({ ...prod, categoryId: prod.categoryId?._id || prod.categoryId, brandId: prod.brandId?._id || prod.brandId, tags: (prod.tags || []).join(", ") }); setShowForm(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            onEdit={(prod: any) => { setFormError(null); setEditing({ ...prod, categoryId: prod.categoryId?._id || prod.categoryId, brandId: prod.brandId?._id || prod.brandId, tags: (prod.tags || []).join(", ") }); setShowForm(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             onHide={(prod: any) => setStatus(prod, "draft")} onShow={(prod: any) => setStatus(prod, "active")}
             onArchive={archive} onRestore={(prod: any) => setStatus(prod, "active")} />
         ))}
